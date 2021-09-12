@@ -6,6 +6,7 @@ import argparse
 import numpy as np
 import scipy.ndimage
 from glob import glob
+import logging
 
 
 # define functions
@@ -48,8 +49,11 @@ def get_largest_component(img):
 
 
 def convert_prob(files, nii_out_path, clean, thresh=0.5):
+    # set up logger
+    logger = logging.getLogger("brain_mask")
+
     # announce files
-    print("Found the following probability file: {}".format(' '.join(files)))
+    logger.info("Found the following probability file: {}".format(' '.join(files)))
 
     # load data
     data = []
@@ -81,13 +85,20 @@ def convert_prob(files, nii_out_path, clean, thresh=0.5):
         data = data > thresh
 
     # binary morph ops
-    struct = scipy.ndimage.generate_binary_structure(3, 2)  # rank 3, connectivity 2
-    struct = scipy.ndimage.iterate_structure(struct, 2)  # iterate structure to 5x5x5
-    data = scipy.ndimage.morphology.binary_erosion(data, structure=struct)  # erosion
-    data = get_largest_component(data)  # largest connected component
-    data = scipy.ndimage.morphology.binary_dilation(data, structure=struct)  # dilation
-    data = scipy.ndimage.morphology.binary_fill_holes(data)  # fill holes
-    data = scipy.ndimage.morphology.binary_closing(data, structure=struct)  # final closing
+    try:
+        struct = scipy.ndimage.generate_binary_structure(3, 2)  # rank 3, connectivity 2
+        struct = scipy.ndimage.iterate_structure(struct, 2)  # iterate structure to 5x5x5
+        data = scipy.ndimage.morphology.binary_erosion(data, structure=struct)  # erosion
+        data = get_largest_component(data)  # largest connected component
+        data = scipy.ndimage.morphology.binary_dilation(data, structure=struct)  # dilation
+        data = scipy.ndimage.morphology.binary_fill_holes(data)  # fill holes
+        data = scipy.ndimage.morphology.binary_closing(data, structure=struct)  # final closing
+    except Exception:
+        logger.error("Mask generation failed... Skipping...")
+        if clean:
+            for f in files:
+                os.remove(f)
+        return nii_out_path
 
     # make output nii
     nii_out = nib.Nifti1Image(data.astype(float), nii.affine, nii.header)

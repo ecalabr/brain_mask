@@ -7,8 +7,9 @@ from glob import glob
 import nibabel as nib
 import numpy as np
 # set tensorflow logging to FATAL before importing things with tensorflow
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0 = INFO, 1 = WARN, 2 = ERROR, 3 = FATAL
-logging.getLogger('tensorflow').setLevel(logging.ERROR)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # 0 = INFO, 1 = WARN, 2 = ERROR, 3 = FATAL
+tf_logger = logging.getLogger('tensorflow')
+tf_logger.setLevel(logging.WARN)
 from utilities.input_fn_util import reconstruct_infer_patches_3d
 from utilities.utils import Params, set_logger
 from utilities.patch_input_fn import patch_input_fn
@@ -17,6 +18,9 @@ from model.model_fn import model_fn
 
 # take raw predictions and convert to nifti file
 def predictions_2_nii(predictions, infer_dir, out_dir, params, mask=None):
+    # set up logging
+    logger = logging.getLogger("brain_mask")
+
     # load one of the original images to restore original shape and to use for masking
     nii1 = nib.load(glob(infer_dir + '/*' + params.data_prefix[0] + '*.nii.gz')[0])
     affine = nii1.affine
@@ -35,7 +39,7 @@ def predictions_2_nii(predictions, infer_dir, out_dir, params, mask=None):
     model_name = os.path.basename(params.model_dir)
     nii_out = os.path.join(out_dir, name_prefix + '_predictions_' + model_name + '.nii.gz')
     img = nib.Nifti1Image(predictions, affine)
-    logging.info("Saving predictions to: " + nii_out)
+    logger.info("Saving predictions to: " + nii_out)
     nib.save(img, nii_out)
     if not os.path.isfile(nii_out):
         raise ValueError("Output nii could not be created at {}".format(nii_out))
@@ -44,7 +48,13 @@ def predictions_2_nii(predictions, infer_dir, out_dir, params, mask=None):
 
 
 # predict a batch of input directories
-def predict(params, pred_dirs, out_dir, mask=None, checkpoint='last'):
+def predict(params, pred_dirs, out_dir, mask=None, checkpoint='last', cpu=False):
+    # set up logging
+    logger = logging.getLogger("brain_mask")
+
+    # handle force cpu
+    if cpu:
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     # load latest checkpoint
     checkpoint_path = os.path.join(params.model_dir, 'checkpoints')
@@ -62,7 +72,7 @@ def predict(params, pred_dirs, out_dir, mask=None, checkpoint='last'):
             except:
                 line1 = "Could not determine 'best' checkpoint based on checkpoint filenames. "
                 line2 = "Use 'last' or pass a specific checkpoint filename to the checkpoint argument."
-                logging.error(line1 + line2)
+                logger.error(line1 + line2)
                 raise ValueError(line1 + line2)
         elif os.path.isfile(os.path.join(my_params.model_dir, "checkpoints/{}.hdf5".format(checkpoint))):
             ckpt = os.path.join(my_params.model_dir, "checkpoints/{}.hdf5".format(checkpoint))
@@ -73,10 +83,10 @@ def predict(params, pred_dirs, out_dir, mask=None, checkpoint='last'):
         # batch size for inference is hard-coded to 1
         params.batch_size = 1
         # recreate the model using infer dims as input dims
-        logging.info("Creating the model...")
+        logger.info("Creating the model...")
         model = model_fn(params)
         # load weights from last checkpoint
-        logging.info("Loading '{}' checkpoint from {}...".format(checkpoint, ckpt))
+        logger.info("Loading '{}' checkpoint from {}...".format(checkpoint, ckpt))
         model.load_weights(ckpt)
     else:
         raise ValueError("No model checkpoints found at {}".format(checkpoint_path))
@@ -97,7 +107,7 @@ def predict(params, pred_dirs, out_dir, mask=None, checkpoint='last'):
             # save nii
             pred_out = predictions_2_nii(predictions, pred_dir, out_dir, params, mask=mask)
         else:
-            logging.info("Predictions already exist and will not be overwritten: {}".format(pred_out))
+            logger.info("Predictions already exist and will not be overwritten: {}".format(pred_out))
         # update list of output niis
         niis_out.append(pred_out)
 
@@ -124,9 +134,21 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--force_cpu', default=False,
                         help="Disable GPU and force all computation to be done on CPU",
                         action='store_true')
+    parser.add_argument('-l', '--logging', default=2,
+                        help="Set logging level: 1=DEBUG, 2=INFO, 3=WARN, 4=ERROR, 5=CRITICAL")
+    args = parser.parse_args()
+
+    # handle logging argument
+    try:
+        args.logging = int(args.logging)
+    except Exception:
+        raise ValueError("Logging level argument must be castable to int but is {}".format(args.logging))
+    assert args.logging in [1, 2, 3, 4, 5], "Logging argument must be in range 1-5 but is {}".format(args.logging)
+    logging.basicConfig()
+    bm_logger = logging.getLogger('brain_mask')
+    bm_logger.setLevel(args.logging * 10)
 
     # handle param argument
-    args = parser.parse_args()
     assert args.param_file, "Must specify param file using --param_file"
     assert os.path.isfile(args.param_file), "No json configuration file found at {}".format(args.param_file)
     my_params = Params(args.param_file)
@@ -152,7 +174,7 @@ if __name__ == '__main__':
     if os.path.isfile(log_path) and my_params.overwrite == 'yes':
         os.remove(log_path)
     set_logger(log_path)
-    logging.info("Log file created at " + log_path)
+    bm_logger.info("Log file created at " + log_path)
 
     # determine directories for inference
     if not any([args.data_dir, args.spec_direc]):
@@ -163,9 +185,9 @@ if __name__ == '__main__':
         if os.path.isdir(args.spec_direc) and all([glob(args.spec_direc + '/*{}.nii.gz'.format(item)) for item in
                                                    my_params.data_prefix]):
             study_dirs = [args.spec_direc]
-            logging.info("Generating predictions for single directory: {}".format(args.spec_direc))
+            bm_logger.info("Generating predictions for single directory: {}".format(args.spec_direc))
         else:
-            logging.error("Specified directory does not have the required files: {}".format(args.spec_direc))
+            bm_logger.error("Specified directory does not have the required files: {}".format(args.spec_direc))
             exit()
     # if specific directory is not specified, then use data_dir argument
     else:
@@ -179,7 +201,7 @@ if __name__ == '__main__':
     study_dirs.sort()
     # make sure there are study dirs found
     if not study_dirs:
-        logging.error("No valid study directories found in parent data directory {}".format(args.data_dir))
+        bm_logger.error("No valid study directories found in parent data directory {}".format(args.data_dir))
         exit()
 
     # handle checkpoint argument
@@ -198,8 +220,8 @@ if __name__ == '__main__':
 
     # handle force cpu argument
     if args.force_cpu:
-        logging.info("Forcing CPU (GPU disabled)")
+        bm_logger.info("Forcing CPU (GPU disabled)")
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     # make predictions
-    pred = predict(my_params, study_dirs, args.out_dir, mask=args.mask, checkpoint=args.checkpoint)
+    pred = predict(my_params, study_dirs, args.out_dir, mask=args.mask, checkpoint=args.checkpoint, cpu=args.force_cpu)

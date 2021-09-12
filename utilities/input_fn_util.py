@@ -789,10 +789,11 @@ def reconstruct_infer_patches_3d(predictions, infer_dir, params):
             _x = tf.zeros_like(x)
             tape.watch(_x)
             _y = extract_patches(_x)
-            grad = tape.gradient(_y, _x)
-            # Divide by grad, to "average" together the overlapping patches
-            # otherwise they would simply sum up
-            return tape.gradient(_y, _x, output_gradients=y) / grad
+        # get gradient
+        grad = tape.gradient(_y, _x)
+        # Divide by grad, to "average" together the overlapping patches
+        # otherwise they would simply sum up
+        return tape.gradient(_y, _x, output_gradients=y) / grad
 
     # load original data as a dummy and convert channel dim size to match output [batch, x, y, z, channel]
     data = load_multicon_preserve_size_3d(infer_dir, data_prefix, data_format, data_plane, norm, norm_mode)

@@ -12,15 +12,26 @@ def dice_loss(y_true, y_pred):
     return 1 - numerator / denominator
 
 
-# combo dice and binary cross entropy
-def combo_loss3d(y_true, y_pred):
+# combo dice and binary cross entropy for use with mirrored strategy
+def combo_loss3d_mirrored(y_true, y_pred):
     def dice_l(y_t, y_p):
         numerator = 2 * tf.reduce_sum(y_t * y_p, axis=(1, 2, 3, 4))
-        denominator = tf.reduce_sum(y_t + y_p, axis=(1, 2, 3, ))
+        denominator = tf.reduce_sum(y_t + y_p, axis=(1, 2, 3, 4))
         return tf.reshape(1 - numerator / denominator, (-1, 1, 1, 1))
 
     return tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM)(y_true, y_pred) + dice_l(y_true,
                                                                                                                 y_pred)
+
+
+# combo dice and binary cross entropy
+def combo_loss3d(y_true, y_pred):
+    def dice_l(y_t, y_p):
+        numerator = 2 * tf.reduce_sum(y_t * y_p, axis=(1, 2, 3, 4))
+        denominator = tf.reduce_sum(y_t + y_p, axis=(1, 2, 3, 4))
+        return tf.reshape(1 - numerator / denominator, (-1, 1, 1, 1))
+
+    return tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.AUTO)(y_true, y_pred) + dice_l(y_true,
+                                                                                                                 y_pred)
 
 
 def loss_picker(params):
