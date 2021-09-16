@@ -159,7 +159,8 @@ if __name__ == '__main__':
     # handle model argument
     script_dir = os.path.dirname(os.path.realpath(__file__))
     model_names = sorted([os.path.basename(item.rstrip("/")) for item in glob(script_dir + "/trained_models/*/")])
-    mod_nf = "Model argument must be one of: {}".format(", ".join(model_names))
+    bm_logger.debug("Found the following pre-trained models: {}".format(", ".join(model_names)))
+    mod_nf = "Model argument must be one of: {}, but is: {}".format(", ".join(model_names), args.model)
     assert args.model in model_names, mod_nf
     my_param_file = os.path.join(script_dir, "trained_models/{}/{}.json".format(args.model, args.model))
     bm_logger.info("Using the following parameter file: {}".format(my_param_file))
