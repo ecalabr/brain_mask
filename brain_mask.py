@@ -158,7 +158,8 @@ if __name__ == '__main__':
 
     # handle model argument
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    model_names = sorted([os.path.basename(item.rstrip("/")) for item in glob(script_dir + "/trained_models/*/")])
+    model_names = sorted(
+        [os.path.basename(item.rstrip("/")) for item in glob(script_dir + "/trained_models/*") if os.path.isdir(item)])
     bm_logger.debug("Found the following pre-trained models: {}".format(", ".join(model_names)))
     mod_nf = "Model argument must be one of: {}, but is: {}".format(", ".join(model_names), args.model)
     assert args.model in model_names, mod_nf
