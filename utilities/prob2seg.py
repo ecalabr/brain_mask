@@ -48,7 +48,50 @@ def get_largest_component(img):
     return out_img
 
 
-def convert_prob(files, nii_out_path, clean, thresh=0.5):
+def get_largest_n_components(img, n=1):
+    s = scipy.ndimage.generate_binary_structure(3, 2)  # iterate structure
+    labeled_array, numpatches = scipy.ndimage.label(img, s)  # labeling
+    sizes = scipy.ndimage.sum(img, labeled_array, range(1, numpatches + 1))
+    sizes_list = [sizes[i] for i in range(len(sizes))]
+    sizes_list.sort()
+    # if n labels is less than n segs, then just use entire image > 0
+    if len(sizes) <= n:
+        out_img = img > 0.
+    # if there are more than n labels, then just get the largest n
+    else:
+        biggest_sizes = sizes_list[-n:]
+        max_labels = np.where(np.isin(sizes, biggest_sizes))[0] + 1
+        components = np.isin(labeled_array, max_labels)
+        out_img = components
+    return out_img
+
+
+def robpow(a, n):
+    return np.sign(a) * (np.abs(a)) ** n
+
+
+def create_superellipse_mask(shape, o=2.5, v=0.9):
+    # unpack shape
+    w, h, d = shape
+
+    # get center
+    center = np.array((int(w / 2), int(h / 2), int(d / 2)))
+
+    # determine ellipsoid
+    x, y, z = np.ogrid[:w, :h, :d]
+    ellipsoid = (
+                (np.abs((x - center[0]) / (center[0])) ** o) +
+                (np.abs((y - center[1]) / (center[1])) ** o) +
+                (np.abs((z - center[2]) / (center[2])) ** o)
+                ) ** (1 / o)
+
+    # make elliptical mask
+    mask = ellipsoid > v
+
+    return mask
+
+
+def convert_prob(files, nii_out_path, clean, thresh=0.5, n_seg=1, zero_periph=True, order=2.5):
     # set up logger
     logger = logging.getLogger("brain_mask")
 
@@ -84,12 +127,17 @@ def convert_prob(files, nii_out_path, clean, thresh=0.5):
     else:
         data = data > thresh
 
+    # zero out array periphery
+    if zero_periph:
+        ellipse_mask = create_superellipse_mask(data.shape, o=order)
+        data[ellipse_mask] = 0
+
     # binary morph ops
     try:
         struct = scipy.ndimage.generate_binary_structure(3, 2)  # rank 3, connectivity 2
         struct = scipy.ndimage.iterate_structure(struct, 2)  # iterate structure to 5x5x5
         data = scipy.ndimage.morphology.binary_erosion(data, structure=struct)  # erosion
-        data = get_largest_component(data)  # largest connected component
+        data = get_largest_n_components(data, n_seg)  # largest connected component
         data = scipy.ndimage.morphology.binary_dilation(data, structure=struct)  # dilation
         data = scipy.ndimage.morphology.binary_fill_holes(data)  # fill holes
         data = scipy.ndimage.morphology.binary_closing(data, structure=struct)  # final closing

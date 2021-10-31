@@ -25,7 +25,8 @@ for phys_dev in physical_devices:
 
 
 # define function to make a batch of brain masks from a list of directories
-def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thresh=0.5, clean=False, names=None):
+def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thresh=0.5, clean=False, names=None, n_seg=1,
+               zero_periph=True, zp_order=2.5):
     # set up logging
     logger = logging.getLogger("brain_mask")
     # handle out_dir = None
@@ -83,7 +84,13 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thres
         prob = predict(params, [direc], out_dir[i], mask=None, checkpoint='last')  # direc must be list for predict fn
 
         # convert probs to mask with cleanup
-        nii_out_path = convert_prob(prob, nii_out_path, clean=clean, thresh=thresh)
+        nii_out_path = convert_prob(prob,
+                                    nii_out_path,
+                                    clean=clean,
+                                    thresh=thresh,
+                                    n_seg=n_seg,
+                                    zero_periph=zero_periph,
+                                    order=zp_order)
 
         # report
         if os.path.isfile(nii_out_path):
@@ -107,18 +114,18 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thres
 if __name__ == '__main__':
     # parse input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--model', default="t1-t1c-t2-flair",
+    parser.add_argument('-m', '--model', default="t1-t1c-t2-flair", type=str,
                         help="Path to params.json")
     parser.add_argument('-n', '--names', default=None, nargs="+",
                         help="Optionally specify a list of suffixes to replace the expected suffixes for inputs")
-    parser.add_argument('-i', '--input_dir', default=None,
-                        help="Input directory or parent directory containing nifti inputs", required=True)
-    parser.add_argument('-o', '--out_dir', default=None,
+    parser.add_argument('-i', '--input_dir', type=str, required=True,
+                        help="Input directory or parent directory containing nifti inputs")
+    parser.add_argument('-o', '--out_dir', default=None, type=str,
                         help="Optionally specify an output directory. Default is to use input directories.")
-    parser.add_argument('-s', '--out_suffix', default="brain_mask",
+    parser.add_argument('-s', '--out_suffix', default="brain_mask", type=str,
                         help="Filename suffix for output mask")
-    parser.add_argument('-t', '--thresh', default=0.5,
-                        help="Probability threshold for predictions")
+    parser.add_argument('-t', '--thresh', default=0.5, type=float,
+                        help="Probability threshold for predictions.")
     parser.add_argument('-p', '--prob', default=False,
                         help="Output probabilities in addition to mask.",
                         action='store_true')
@@ -126,24 +133,33 @@ if __name__ == '__main__':
                         help="Overwrite existing data.",
                         action='store_true')
     parser.add_argument('-f', '--force_cpu', default=False,
-                        help="Disable GPU and force all computation to be done on CPU",
+                        help="Disable GPU and force all computation to be done on CPU.",
                         action='store_true')
-    parser.add_argument('-l', '--logging', default=2,
+    parser.add_argument('-l', '--logging', default=2, type=int, choices=[1, 2, 3, 4, 5],
                         help="Set logging level: 1=DEBUG, 2=INFO, 3=WARN, 4=ERROR, 5=CRITICAL")
+    parser.add_argument('-c', '--components', type=int, default=1,
+                        help="Number of connected components in output mask.")
+    parser.add_argument('-z', '--zero_periphery', default=True,
+                        help="Zero the periphery of probability image (using a superellipse mask) before binarizing."
+                             " This can remove unwanted artifacts at the periphery of the image.",
+                        action='store_false')
+    parser.add_argument('-y', '--zp_order', default=2.5, type=float,
+                        help="If using zero_periphery - optionally specify the exponent for the superellipse.")
+    parser.add_argument('--start', default=0, type=int,
+                        help="Index of directories to start processing at (starting from 0 [default].")
+    parser.add_argument('--end', default=-1, type=int,
+                        help="Index of directories to end processing at. -1 [default] is the last directory.")
+    parser.add_argument('--list', action="store_true", default=False,
+                        help="List the directories to be processed in order and exit without doing anything.")
     args = parser.parse_args()
 
     # handle logging argument
-    try:
-        args.logging = int(args.logging)
-    except Exception:
-        raise ValueError("Logging level argument must be castable to int but is {}".format(args.logging))
-    assert args.logging in [1, 2, 3, 4, 5], "Logging argument must be in range 1-5 but is {}".format(args.logging)
+    args.logging = args.logging
     logging.basicConfig()
     bm_logger = logging.getLogger('brain_mask')
     bm_logger.setLevel(args.logging * 10)
 
     # handle input argument
-    assert args.input_dir, "Must specify input directory using -i or --input_dir"
     assert os.path.isdir(args.input_dir), "Specified input directory does not exist: {}".format(args.input_dir)
     if glob(args.input_dir + "/*.nii.gz"):
         data_dirs = [args.input_dir]
@@ -154,7 +170,20 @@ if __name__ == '__main__':
 
     # sort data dirs
     data_dirs = sorted(data_dirs)
-    # start, end, and list arguments could be added here
+
+    # handle start and end arguments
+    if args.end != -1:
+        data_dirs = data_dirs[int(args.start):int(args.end) + 1]
+    else:
+        data_dirs = data_dirs[int(args.start):]
+    if isinstance(data_dirs, str):
+        data_dirs = [data_dirs]
+
+    # handle list argument
+    if args.list:
+        for i, item in enumerate(data_dirs, 0):
+            print(str(i) + ': ' + item)
+        exit()
 
     # handle model argument
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -169,13 +198,6 @@ if __name__ == '__main__':
     # handle out_dir argument
     if args.out_dir:
         assert os.path.isdir(args.out_dir), "Specified output directory does not exist: {}".format(args.out_dir)
-
-    # handle thresh argument
-    if not isinstance(args.thresh, float):
-        try:
-            args.thresh = float(args.thresh)
-        except:
-            raise ValueError("Could not cast thresh argument to float: {}".format(args.thresh))
 
     # handle suffix argument
     if not isinstance(args.out_suffix, str):
@@ -197,4 +219,8 @@ if __name__ == '__main__':
                                     overwrite=args.overwrite,
                                     thresh=args.thresh,
                                     clean=not args.prob,
-                                    names=args.names)
+                                    names=args.names,
+                                    n_seg=args.components,
+                                    zero_periph=args.zero_periphery,
+                                    zp_order=args.zp_order
+                                    )

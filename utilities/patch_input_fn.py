@@ -194,6 +194,9 @@ def get_study_dirs(params, change_basedir=None):
         study_dirs = [study for study in study_dirs if all(
             [glob('{}/*{}.nii.gz'.format(study, item)) and os.path.isfile(glob('{}/*{}.nii.gz'.format(study, item))[0])
              for item in params.data_prefix + params.label_prefix])]
+        # error if no valid study dirs found
+        assert len(study_dirs) >= 1, "No valid Study directories found in data directory: {} using prefixes: {}".format(
+            params.data_dir, params.data_prefix + params.label_prefix)
 
         # study dirs sorted in alphabetical order for reproducible results
         study_dirs.sort()
