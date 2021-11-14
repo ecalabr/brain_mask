@@ -1,34 +1,24 @@
 """ Wrapper script for making masks from images using CNN """
 
-import argparse
-import os
-from glob import glob
-from utilities.prob2seg import convert_prob
-import logging
-from utilities.utils import Params
-from predict import predict
-
 # set up tensorflow logging before import
+import logging
+import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # 0 = INFO, 1 = WARN, 2 = ERROR, 3 = FATAL
 tf_logger = logging.getLogger('tensorflow')
 tf_logger.setLevel(logging.WARN)
 import tensorflow as tf
-
-# limit tensorflow memory growth at start
-physical_devices = tf.config.list_physical_devices('GPU')
-for phys_dev in physical_devices:
-    try:
-        tf.config.experimental.set_memory_growth(phys_dev, True)
-    except:
-        # Invalid device or cannot modify virtual devices once initialized.
-        pass
+import argparse
+from glob import glob
+from utilities.prob2seg import convert_prob
+from utilities.utils import load_param_file, set_logger
+from predict import predict
 
 
 # define function to make a batch of brain masks from a list of directories
 def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thresh=0.5, clean=False, names=None, n_seg=1,
                zero_periph=True, zp_order=2.5):
     # set up logging
-    logger = logging.getLogger("brain_mask")
+    bm_logger = logging.getLogger()
     # handle out_dir = None
     if out_dir is None:
         out_dir = infer_direcs
@@ -41,7 +31,7 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thres
     outnames = []
     failed = []
     # load params
-    params = Params(param_file)
+    params = load_param_file(param_file)
     # turn off mixed precision and distribution
     params.dist_strat = "none"
     params.mixed_precision = False
@@ -51,9 +41,9 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thres
             names = [names]
         assert len(names) == len(params.data_prefix), "Length of specified suffixes is {} but should be {}".format(
             len(names), len(params.data_prefix))
-        logger.info("Using user specified suffixes for data as follows:")
+        bm_logger.info("Using user specified suffixes for data as follows:")
         for n, o in zip(names, params.data_prefix):
-            logger.info("{} --> {}".format(o, n))
+            bm_logger.info("    {} --> {}".format(o, n))
         params.data_prefix = names
     # get model dir
     if params.model_dir == 'same':  # this allows the model dir to be inferred from params.json file path
@@ -61,13 +51,13 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thres
     if not os.path.isdir(params.model_dir):
         raise ValueError("Specified model directory does not exist")
     # run inference and post-processing for each infer_dir
-    for i, direc in enumerate(infer_direcs):
-        logger.info("Processing the following directory: {}".format(direc))
+    for n, direc in enumerate(infer_direcs):
+        bm_logger.info("Processing the following directory: {}".format(direc))
         # make sure all required files exist in data directory, if not, skip
         skip = 0
         for suf in params.data_prefix:
             if not glob(direc + "/*{}.nii.gz".format(suf)):
-                logger.info("Directory {} is missing required file: {} and will be skipped...".format(direc, suf))
+                bm_logger.info("Directory {} is missing required file: {} and will be skipped...".format(direc, suf))
                 skip = 1
         if skip:
             continue
@@ -77,11 +67,17 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thres
         # if overwrite not set, make sure output doesn't exist before proceeding
         if not overwrite:
             if os.path.isfile(nii_out_path):
-                logger.info("Mask file already exists at {} and overwrite argument is false".format(nii_out_path))
+                bm_logger.info("Mask file already exists at {} and overwrite argument is false".format(nii_out_path))
                 continue
 
         # run predict on one directory and get the output probabilities
-        prob = predict(params, [direc], out_dir[i], mask=None, checkpoint='last')  # direc must be list for predict fn
+        try:
+            prob = predict(params, [direc], out_dir[n], mask=None, checkpoint='last')  # direc must be list
+        except Exception as ex:
+            bm_logger.info("Prediction failed for study {}, most likely due to GPU memory exhaustion."
+                           " See debug logger for details.".format(direc))
+            bm_logger.info(ex)
+            continue
 
         # convert probs to mask with cleanup
         nii_out_path = convert_prob(prob,
@@ -94,7 +90,7 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thres
 
         # report
         if os.path.isfile(nii_out_path):
-            logger.info("Created mask file at: {}".format(nii_out_path))
+            bm_logger.info("Created mask file at: {}".format(nii_out_path))
             # add to outname list
             outnames.append(nii_out_path)
         else:
@@ -105,7 +101,7 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thres
 
     # report failures
     if failed:
-        logger.info("Mask generation failed for the following directories:\n{}".format("\n".join(failed)))
+        bm_logger.info("Mask generation failed for the following directories:\n{}".format("\n".join(failed)))
 
     return outnames, failed
 
@@ -139,11 +135,11 @@ if __name__ == '__main__':
                         help="Set logging level: 1=DEBUG, 2=INFO, 3=WARN, 4=ERROR, 5=CRITICAL")
     parser.add_argument('-c', '--components', type=int, default=1,
                         help="Number of connected components in output mask.")
-    parser.add_argument('-z', '--zero_periphery', default=True,
+    parser.add_argument('-z', '--zero_periphery', default=False,
                         help="Zero the periphery of probability image (using a superellipse mask) before binarizing."
                              " This can remove unwanted artifacts at the periphery of the image.",
-                        action='store_false')
-    parser.add_argument('-y', '--zp_order', default=2.5, type=float,
+                        action='store_true')
+    parser.add_argument('-y', '--zp_order', default=3, type=float,
                         help="If using zero_periphery - optionally specify the exponent for the superellipse.")
     parser.add_argument('--start', default=0, type=int,
                         help="Index of directories to start processing at (starting from 0 [default].")
@@ -154,10 +150,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # handle logging argument
-    args.logging = args.logging
-    logging.basicConfig()
-    bm_logger = logging.getLogger('brain_mask')
-    bm_logger.setLevel(args.logging * 10)
+    log_path = None
+    if args.out_dir:
+        log_path = os.path.join(args.out_dir, 'brain_mask.log')
+        if os.path.isfile(log_path) and args.overwrite:
+            os.remove(log_path)
+    logger = set_logger(log_path, level=args.logging * 10)
 
     # handle input argument
     assert os.path.isdir(args.input_dir), "Specified input directory does not exist: {}".format(args.input_dir)
@@ -189,11 +187,11 @@ if __name__ == '__main__':
     script_dir = os.path.dirname(os.path.realpath(__file__))
     model_names = sorted(
         [os.path.basename(item.rstrip("/")) for item in glob(script_dir + "/trained_models/*") if os.path.isdir(item)])
-    bm_logger.debug("Found the following pre-trained models: {}".format(", ".join(model_names)))
+    logger.debug("Found the following pre-trained models: {}".format(", ".join(model_names)))
     mod_nf = "Model argument must be one of: {}, but is: {}".format(", ".join(model_names), args.model)
     assert args.model in model_names, mod_nf
-    my_param_file = os.path.join(script_dir, "trained_models/{}/{}.json".format(args.model, args.model))
-    bm_logger.info("Using the following parameter file: {}".format(my_param_file))
+    my_param_file = os.path.join(script_dir, "trained_models/{}/{}.yml".format(args.model, args.model))
+    logger.info("Using the following parameter file: {}".format(my_param_file))
 
     # handle out_dir argument
     if args.out_dir:
@@ -208,8 +206,17 @@ if __name__ == '__main__':
 
     # handle force cpu argument
     if args.force_cpu:
-        bm_logger.info("Forcing CPU (GPU disabled)")
+        logger.info("Forcing CPU (GPU disabled)")
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    else:
+        # if using GPU, limit tensorflow GPU memory growth
+        physical_devices = tf.config.list_physical_devices('GPU')
+        for phys_dev in physical_devices:
+            try:
+                tf.config.experimental.set_memory_growth(phys_dev, True)
+            except:
+                # Invalid device or cannot modify virtual devices once initialized.
+                pass
 
     # do work
     output_names, fail = batch_mask(data_dirs,

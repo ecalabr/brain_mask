@@ -1,11 +1,33 @@
+"""
+Allows user to choose a specific activation using a string in parameter file
+"""
+
 import tensorflow as tf
 
 
-# get built in locals
-start_globals = list(globals().keys())
+class Activations:
+    methods = {}
+
+    def __init__(self, params):
+        self.act = params.activation
+        if self.act not in self.methods:
+            raise ValueError(
+                "Specified activation method: '{}' is not an available method: {}".format(self.act, self.methods))
+
+    def __call__(self, x):
+        return self.methods[self.act]()(x)
+
+    @classmethod
+    def register_method(cls, name):
+        def decorator(method):
+            cls.methods[name] = method
+            return method
+        return decorator
 
 
+# methods:
 # regular relu
+@Activations.register_method("relu")
 def relu():
     return tf.keras.layers.ReLU(
         max_value=None,
@@ -15,6 +37,7 @@ def relu():
 
 
 # leaky relu
+@Activations.register_method("leaky_relu")
 def leaky_relu():
     return tf.keras.layers.LeakyReLU(
         alpha=0.3
@@ -22,6 +45,7 @@ def leaky_relu():
 
 
 # prelu
+@Activations.register_method("prelu")
 def prelu():
     return tf.keras.layers.PReLU(
         alpha_initializer='zeros',
@@ -29,21 +53,3 @@ def prelu():
         alpha_constraint=None,
         shared_axes=None
     )
-
-
-def activation_layer(activation_method):
-
-    # sanity checks
-    if not isinstance(activation_method, str):
-        raise ValueError("Activation parameter must be a string")
-
-    # check for specified loss method and error if not found
-    if activation_method.lower() in globals():
-        return globals()[activation_method]()
-    else:
-        try:
-            return tf.keras.layers.Activation(activation_method)
-        except:
-            methods = [k for k in globals().keys() if k not in start_globals]
-            raise NotImplementedError(
-                "Specified activation method: '{}' is not an available method: {}".format(activation_method, methods))

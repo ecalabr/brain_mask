@@ -1,11 +1,15 @@
+"""
+Utility functions for use by input_functions.py
+"""
+
 import os
 import math
 from glob import glob
 import numpy as np
 import nibabel as nib
-import scipy.stats as stats
 import scipy.ndimage as ndi
 import tensorflow as tf
+from utilities.normalizers import Normalizers
 
 
 ##############################################
@@ -61,7 +65,7 @@ def _load_single_study(study_dir, file_prefixes, data_format, plane=None, norm=F
             nii = nib.load(images[ind])
         # handle normalization
         if norm:
-            data[..., ind] = _normalize(nii.get_fdata(), norm_mode)
+            data[..., ind] = Normalizers(norm_mode)(nii.get_fdata())
         else:
             data[..., ind] = nii.get_fdata()
 
@@ -317,70 +321,6 @@ def _affine_transform_roi(image, roi, labels=None, affine=None, dilate=None, ord
         return image, roi
 
 
-def _normalize(input_img, mode='zero_mean'):
-    """
-    Performs image normalization to zero mean, unit variance or to interval [0, 1].
-    :param input_img: (np.ndarray) The input numpy array.
-    :param mode: (str) The normalization mode: 'unit' for scaling to [0,1] or 'zero_mean' for zero mean, unit variance.
-    :return: The input array normalized to zero mean, unit variance or [0, 1].
-    """
-
-    # sanity checks
-    if not isinstance(input_img, np.ndarray):
-        raise TypeError("Input image should be np.ndarray but is: " + str(type(input_img)))
-
-    # define epsilon for divide by zero errors
-    epsilon = 1e-10
-
-    # handle unit mode
-    def unit(img):
-        # perform normalization to [0, 1]
-        img *= 1.0 / (np.max(img) + epsilon)
-        return img
-
-    # handle mean zscore
-    def zscore(img):
-        # perform z score normalization to 0 mean, unit std
-        nonzero_bool = img != 0.
-        mean = np.mean(img[nonzero_bool], axis=None)
-        std = np.std(img[nonzero_bool], axis=None) + epsilon
-        img = np.where(nonzero_bool, ((img - mean) / std), 0.)
-        return img
-
-    # handle mean stdev
-    def mean_stdev(img):
-        # constants
-        new_mean = 1000.
-        new_std = 200.
-        # perform normalization to specified mean, stdev
-        nonzero_bool = img != 0.
-        mean = np.mean(img[nonzero_bool], axis=None)
-        std = np.std(img[nonzero_bool], axis=None) + epsilon
-        img = np.where(nonzero_bool, ((img - mean) / (std / new_std)) + new_mean, 0.)
-        return img
-
-    # handle median interquartile range
-    def med_iqr(img, new_med=0., new_stdev=1.):
-        # perform normalization to median, normalized interquartile range
-        # uses factor of 0.7413 to normalize interquartile range to standard deviation
-        nonzero_bool = img != 0.
-        med = np.median(img[nonzero_bool], axis=None)
-        niqr = stats.iqr(img[nonzero_bool], axis=None) * 0.7413 + epsilon
-        img = np.where(nonzero_bool, ((img - med) / (niqr / new_stdev)) + new_med, 0.)
-        return img
-
-    # handle not implemented
-    if mode in locals():
-        input_img = locals()[mode](input_img)
-    else:
-        # get list of available normalization modes
-        norm_modes = [k for k in locals().keys() if k not in ["input_img", "mode", "epsilon"]]
-        raise NotImplementedError(
-            "Specified normalization mode: '{}' is not one of the available modes: {}".format(mode, norm_modes))
-
-    return input_img
-
-
 def _nonzero_slice_inds3d(input_numpy):
     """
     Takes numpy array and returns slice indices of first and last nonzero pixels in 3d
@@ -452,8 +392,6 @@ def _zero_pad_image(input_data, out_dims, axes):
 ##############################################
 # TENSORFLOW MAP FUNCTIONS
 ##############################################
-
-
 def tf_patches_3d(data, labels, patch_size, data_format, data_chan, label_chan=1, overlap=1, weighted=False):
     """
     Extract 3D patches from a data array with overlap if desired
@@ -584,180 +522,153 @@ def filter_zero_patches(labels, data_format, mode, thresh=0.05):
 
 
 ##############################################
-# PY FUNC 3D DATA FUNCTIONS
+# PY FUNC DATA FUNCTIONS
 ##############################################
-
-
-def load_roi_multicon_and_labels_3d(study_dir, feature_prefx, label_prefx, mask_prefx, dilate=0, plane='ax',
-                                    data_fmt='channels_last', aug=False, interp=1, norm=True, norm_lab=True,
-                                    norm_mode='zero_mean', return_mask=False):
+class LoadRoiMulticonAndLabels3D:
     """
     Patch loader generates 3D patch data for images and labels given a list of 3D input NiFTI images a mask.
     Performs optional data augmentation with affine rotation in 3D.
     Data is cropped to the nonzero bounding box for the mask file before patches are generated.
-    :param study_dir: (str) The path to the study directory to get data from.
-    :param feature_prefx: (iterable of str) The prefixes for the image files containing the data (features).
-    :param label_prefx: (str) The prefix for the image files containing the labels.
-    :param dilate: (int) The amount to dilate the region by in all dimensions
-    :param mask_prefx: (str) The prefixe for the image files containing the data mask. None uses no masking.
-    :param plane: (str) The plane to load data in. Must be a string in ['ax', 'cor', 'sag']
-    :param data_fmt (str) the desired tensorflow data format. Must be either 'channels_last' or 'channels_first'
-    :param aug: (bool) Whether or not to perform data augmentation with random 3D affine rotation.
-    :param interp: (int) The order of spline interpolation for label data. Must be 0-5
-    :param norm: (bool) Whether or not to normalize the input data after loading.
-    :param norm_lab: (bool) whether or not to normalize the label data after loading.
-    :param norm_mode: (str) The method for normalization, used by normalize function.
-    :param return_mask: (bool or list) whether or not to return the mask as one of the outputs. If list, mask values are
-    mapped to the values in the list. For example, passing [1, 2, 4] would map mask value 0->1, 1->2, 2->4.
-    :return: (tf.tensor) The patch data for features and labels as a tensorflow variable.
     """
+    def __init__(self, params):
+        self.params = params
 
-    # convert bytes to strings
-    study_dir = _byte_convert(study_dir)
-    feature_prefx = _byte_convert(feature_prefx)
-    label_prefx = _byte_convert(label_prefx)
-    mask_prefx = _byte_convert(mask_prefx)
-    plane = _byte_convert(plane)
-    data_fmt = _byte_convert(data_fmt)
-    norm_mode = _byte_convert(norm_mode)
+    def load(self, study_dir):
 
-    # handle return mask argument, which should be bool or a list (np.ndarray) of ints to map weight values to
-    if isinstance(return_mask, np.bool_) and not return_mask:
-        # if return_mask is false set to None for ease of identifying below
-        return_mask = None
+        # convert bytes to strings and get relevant params
+        study_dir = _byte_convert(study_dir)
+        params = self.params
+        feature_prefx = params.data_prefix
+        label_prefx = params.label_prefix
+        dilate = params.mask_dilate
+        mask_prefx = params.mask_prefix
+        plane = params.data_plane
+        data_fmt = params.data_format
+        aug = params.augment_train_data
+        interp = params.label_interp
+        norm = params.norm_data
+        norm_mode = params.norm_mode
+        norm_lab = params.norm_labels
 
-    # sanity checks
-    if plane not in ['ax', 'cor', 'sag']:
-        raise ValueError("Did not understand specified plane: " + str(plane))
-    if data_fmt not in ['channels_last', 'channels_first']:
-        raise ValueError("Did not understand specified data_fmt: " + str(plane))
+        # sanity checks
+        if plane not in ['ax', 'cor', 'sag']:
+            raise ValueError("Did not understand specified plane: " + str(plane))
+        if data_fmt not in ['channels_last', 'channels_first']:
+            raise ValueError("Did not understand specified data_fmt: " + str(plane))
 
-    # define full paths
-    data_files = [glob(study_dir + '/*' + contrast + '.nii.gz')[0] for contrast in feature_prefx]
-    labels_file = glob(study_dir + '/*' + label_prefx[0] + '.nii.gz')[0]
-    if mask_prefx:
-        mask_file = glob(study_dir + '/*' + mask_prefx[0] + '.nii.gz')[0]
-    else:
-        mask_file = data_files[0]
-    if not all([os.path.isfile(img) for img in data_files + [labels_file] + [mask_file]]):
-        raise ValueError("One or more of the input data/labels/mask files does not exist")
-
-    # load the mask and get the full data dims - handle None mask argument
-    if mask_prefx:
-        mask = nib.load(mask_file).get_fdata()
-    else:
-        mask = np.ones_like(nib.load(mask_file).get_fdata(), dtype=np.float32)
-    data_dims = mask.shape
-
-    # load data and normalize
-    data = np.empty((data_dims[0], data_dims[1], data_dims[2], len(data_files)), dtype=np.float32)
-    for i, im_file in enumerate(data_files):
-        if norm:
-            data[:, :, :, i] = _normalize(nib.load(im_file).get_fdata(), mode=norm_mode)
+        # define full paths
+        data_files = [glob(study_dir + '/*' + contrast + '.nii.gz')[0] for contrast in feature_prefx]
+        labels_file = glob(study_dir + '/*' + label_prefx[0] + '.nii.gz')[0]
+        if mask_prefx:
+            mask_file = glob(study_dir + '/*' + mask_prefx[0] + '.nii.gz')[0]
         else:
-            data[:, :, :, i] = nib.load(im_file).get_fdata()
+            mask_file = data_files[0]
+        if not all([os.path.isfile(img) for img in data_files + [labels_file] + [mask_file]]):
+            raise ValueError("One or more of the input data/labels/mask files does not exist")
 
-    # load labels with NORMALIZATION - add option for normalized vs non-normalized labels here
-    if norm_lab:
-        labels = _normalize(nib.load(labels_file).get_fdata(), mode=norm_mode)
-    else:
-        labels = nib.load(labels_file).get_fdata()
+        # load the mask and get the full data dims - handle None mask argument (in which case whole image is used)
+        if mask_prefx:
+            mask = nib.load(mask_file).get_fdata()
+        else:
+            mask = np.ones_like(nib.load(mask_file).get_fdata(), dtype=np.float32)
+        data_dims = mask.shape
 
-    # center the ROI in the image usine affine, with optional rotation for data augmentation
-    if aug:  # if augmenting, select random rotation values for x, y, and z axes depending on plane
-        posneg = 1 if np.random.random() < 0.5 else -1
-        theta = np.random.random() * (np.pi / 6.) * posneg if plane == 'cor' else 0.  # rotation in yz plane
-        phi = np.random.random() * (np.pi / 6.) * posneg if plane == 'sag' else 0.  # rotation in xz plane
-        psi = np.random.random() * (np.pi / 6.) * posneg if plane == 'ax' else 0.  # rotation in xy plane
-    else:  # if not augmenting, no rotation is applied, and affine is used only for offset to center the mask ROI
-        theta = 0.
-        phi = 0.
-        psi = 0.
+        # load data and normalize
+        data = np.empty((data_dims[0], data_dims[1], data_dims[2], len(data_files)), dtype=np.float32)
+        for i, im_file in enumerate(data_files):
+            if norm:
+                data[:, :, :, i] = Normalizers(norm_mode)(nib.load(im_file).get_fdata())
+            else:
+                data[:, :, :, i] = nib.load(im_file).get_fdata()
 
-    # make affine, calculate offset using mask center of mass of binirized mask, get nonzero bbox of mask
-    affine = _create_affine(theta=theta, phi=phi, psi=psi)
+        # load labels with NORMALIZATION - add option for normalized vs non-normalized labels here
+        if norm_lab:
+            labels = Normalizers(norm_mode)(nib.load(labels_file).get_fdata())
+        else:
+            labels = nib.load(labels_file).get_fdata()
 
-    # apply affines to mask, data, labels
-    data, mask, labels = _affine_transform_roi(data, mask, labels, affine, dilate, interp)
+        # center the ROI in the image usine affine, with optional rotation for data augmentation
+        if aug:  # if augmenting, select random rotation values (+/- 30 deg) for each of x, y, and z axes
+            posneg = 1 if np.random.random() < 0.5 else -1
+            theta = np.random.random() * (np.pi / 6.) * posneg  # rotation in yz plane
+            posneg = 1 if np.random.random() < 0.5 else -1
+            phi = np.random.random() * (np.pi / 6.) * posneg  # rotation in xz plane
+            posneg = 1 if np.random.random() < 0.5 else -1
+            psi = np.random.random() * (np.pi / 6.) * posneg  # rotation in xy plane
+        else:  # if not augmenting, no rotation is applied, and affine is used only for offset to center the mask ROI
+            theta = 0.
+            phi = 0.
+            psi = 0.
 
-    # add batch and channel dims as necessary to get to [batch, x, y, z, channel]
-    data = np.expand_dims(data, axis=0)  # add a batch dimension of 1
-    labels = np.expand_dims(labels, axis=(0, 4))  # add a batch and channel dimension of 1
-    if return_mask is not None:
-        mask = np.expand_dims(mask, axis=(0, 4))  # add a batch and channel dimension of 1
+        # make affine, calculate offset using mask center of mass of binirized mask, get nonzero bbox of mask
+        affine = _create_affine(theta=theta, phi=phi, psi=psi)
 
-    # handle different planes
-    if plane == 'ax':
-        pass
-    elif plane == 'cor':
-        data = np.transpose(data, axes=[0, 1, 3, 2, 4])
-        labels = np.transpose(labels, axes=[0, 1, 3, 2, 4])
-        if return_mask is not None:
-            mask = np.transpose(mask, axes=[0, 1, 3, 2, 4])
-    elif plane == 'sag':
-        data = np.transpose(data, axes=[0, 2, 3, 1, 4])
-        labels = np.transpose(labels, axes=[0, 2, 3, 1, 4])
-        if return_mask is not None:
-            mask = np.transpose(mask, axes=[0, 1, 3, 2, 4])
-    else:
-        raise ValueError("Did not understand specified plane: " + str(plane))
+        # apply affines to mask, data, labels
+        data, mask, labels = _affine_transform_roi(data, mask, labels, affine, dilate, interp)
 
-    # handle channels first data format
-    if data_fmt == 'channels_first':
-        data = np.transpose(data, axes=[0, 4, 1, 2, 3])
-        labels = np.transpose(labels, axes=[0, 4, 1, 2, 3])
-        if return_mask is not None:
-            mask = np.transpose(mask, axes=[0, 4, 1, 2, 3])
+        # add batch and channel dims as necessary to get to [batch, x, y, z, channel]
+        data = np.expand_dims(data, axis=0)  # add a batch dimension of 1
+        labels = np.expand_dims(labels, axis=(0, 4))  # add a batch and channel dimension of 1
 
-    # handle return_mask argument as list of value mappings
-    if isinstance(return_mask, np.ndarray):
-        # map each value of mask to the corresponding loss factor
-        mask = return_mask[mask.astype(np.int32)]
+        # handle different planes
+        if plane == 'ax':
+            pass
+        elif plane == 'cor':
+            data = np.transpose(data, axes=[0, 1, 3, 2, 4])
+            labels = np.transpose(labels, axes=[0, 1, 3, 2, 4])
+        elif plane == 'sag':
+            data = np.transpose(data, axes=[0, 2, 3, 1, 4])
+            labels = np.transpose(labels, axes=[0, 2, 3, 1, 4])
+        else:
+            raise ValueError("Did not understand specified plane: " + str(plane))
 
-    # handle return_mask flag
-    if return_mask is not None:
-        # concatenate weights to last (channels) dimension of labels to sneak it into model.fit for custom weighted loss
-        return data.astype(np.float32), np.concatenate((labels.astype(np.float32), mask.astype(np.float32)), axis=-1)
-    else:
+        # handle channels first data format
+        if data_fmt == 'channels_first':
+            data = np.transpose(data, axes=[0, 4, 1, 2, 3])
+            labels = np.transpose(labels, axes=[0, 4, 1, 2, 3])
+
         return data.astype(np.float32), labels.astype(np.float32)
 
 
-def load_multicon_preserve_size_3d(study_dir, feat_prefx, data_fmt, plane='ax', norm=True, norm_mode='zero_mean'):
+class LoadMulticonPreserveSize3D:
     """
     Load multicontrast image data without cropping or otherwise adjusting size. For use with inference/prediction.
-    :param study_dir: (str) A directory containing the desired image data.
-    :param feat_prefx: (list) a list of filenames - the data files to be loaded
-    :param data_fmt: (str) the desired tensorflow data format. Must be either 'channels_last' or 'channels_first'
-    :param plane: (str) The plane to load data in. Must be a string in ['ax', 'cor', 'sag']
-    :param norm: (bool) Whether or not to normalize the input data after loading
-    :param norm_mode: (str) The method for normalization, used by normalize function.
-    :return: np ndarray containing the image data and regression target in the specified tf data format
     """
+    def __init__(self, params):
+        self.params = params
 
-    # convert bytes to strings
-    study_dir = _byte_convert(study_dir)
-    feat_prefx = _byte_convert(feat_prefx)
-    plane = _byte_convert(plane)
-    data_fmt = _byte_convert(data_fmt)
-    norm_mode = _byte_convert(norm_mode)
+    def load(self, study_dir):
 
-    # sanity checks
-    if not os.path.isdir(study_dir):
-        raise ValueError("Specified study_directory does not exist")
-    if not all([isinstance(a, str) for a in feat_prefx]):
-        raise ValueError("Data prefixes must be strings")
-    if data_fmt not in ['channels_last', 'channels_first']:
-        raise ValueError("data_format invalid")
+        # get relevant params
+        study_dir = _byte_convert(study_dir)
+        params = self.params
+        feat_prefx = params.data_prefix
+        data_fmt = params.data_format
+        plane = params.data_plane
+        norm = params.norm_data
+        norm_mode = params.norm_mode
 
-    # load multi-contrast data and normalize, no slice trimming for infer data
-    data = _load_single_study(study_dir, feat_prefx, data_format=data_fmt, plane=plane, norm=norm, norm_mode=norm_mode)
+        # sanity checks
+        if not os.path.isdir(study_dir):
+            raise ValueError("Specified study_directory does not exist")
+        if not all([isinstance(a, str) for a in feat_prefx]):
+            raise ValueError("Data prefixes must be strings")
+        if data_fmt not in ['channels_last', 'channels_first']:
+            raise ValueError("data_format invalid")
 
-    # generate batch size==1 format such that format is [1, x, y, z, c] or [1, c, x, y, z]
-    data = np.expand_dims(data, axis=0)
+        # load multi-contrast data and normalize, no slice trimming for infer data
+        data = _load_single_study(study_dir, feat_prefx, data_format=data_fmt, plane=plane, norm=norm,
+                                  norm_mode=norm_mode)
 
-    return data
+        # generate batch size==1 format such that format is [1, x, y, z, c] or [1, c, x, y, z]
+        data = np.expand_dims(data, axis=0)
+
+        return data
 
 
+##############################################
+# PATCH RECONSTRUCTION FUNCTIONS
+##############################################
 def reconstruct_infer_patches_3d(predictions, infer_dir, params):
     """
     Function for reconstructing the input 3D volume from the output predictions after 3D image patch prediction
@@ -770,11 +681,6 @@ def reconstruct_infer_patches_3d(predictions, infer_dir, params):
     # define params - converting all to python native variables as they may be imported as numpy
     patch_size = params.infer_dims
     overlap = params.infer_patch_overlap
-    data_prefix = [str(item) for item in params.data_prefix]
-    data_format = params.data_format
-    data_plane = params.data_plane
-    norm = params.norm_data
-    norm_mode = params.norm_mode
 
     # for sliding window 3d slabs - must be same as in _tf_patches_3d_infer above
     ksizes = [1] + patch_size + [1]
@@ -796,7 +702,7 @@ def reconstruct_infer_patches_3d(predictions, infer_dir, params):
         return tape.gradient(_y, _x, output_gradients=y) / grad
 
     # load original data as a dummy and convert channel dim size to match output [batch, x, y, z, channel]
-    data = load_multicon_preserve_size_3d(infer_dir, data_prefix, data_format, data_plane, norm, norm_mode)
+    data = LoadMulticonPreserveSize3D(params).load(infer_dir)
     data = np.zeros((data.shape[0:4] + (params.output_filters,)), dtype=np.float32)
 
     # get shape of patches as they would have been generated during inference

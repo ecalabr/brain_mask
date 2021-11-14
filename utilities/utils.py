@@ -1,147 +1,238 @@
-""" General utility functions """
+"""
+Utility functions for general use
+"""
 
-import json
+import yaml
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+from glob import glob
+import random
 
 
-class Params:
+def load_param_file(yaml_path):
     """
-    Class that loads hyperparameters from a json file.
+    Function loads hyperparameters from a yaml or yml file.
     Example:
-    params = Params(json_path)
+    params = load_param_file(yaml_path)
     print(params.learning_rate)
     params.learning_rate = 0.5  # change the value of learning_rate in params
     """
 
-    # declare attributes as None initially. All attributes defined here must be fed values from params.json.
-    data_dir = None
-    model_dir = None
-    overwrite = None
-    random_state = None
+    required_params = [
+        "data_dir",
+        "model_dir",
+        "overwrite",
+        "random_state",
+        "data_prefix",
+        "label_prefix",
+        "mask_prefix",
+        "mask_dilate",
+        "filter_zero",
+        "input_function",
+        "data_plane",
+        "train_dims",
+        "train_patch_overlap",
+        "infer_dims",
+        "infer_patch_overlap",
+        "augment_train_data",
+        "label_interp",
+        "metrics",
+        "norm_data",
+        "norm_labels",
+        "norm_mode",
+        "model_name",
+        "base_filters",
+        "output_filters",
+        "layer_layout",
+        "final_layer",
+        "kernel_size",
+        "data_format",
+        "activation",
+        "mixed_precision",
+        "dist_strat",
+        "shuffle_size",
+        "batch_size",
+        "num_threads",
+        "samples_per_epoch",
+        "train_fract",
+        "learning_rate",
+        "learning_rate_decay",
+        "loss",
+        "optimizer",
+        "num_epochs",
+        "dropout_rate"
+    ]
 
-    data_prefix = None
-    label_prefix = None
-    mask_prefix = None
-    mask_dilate = None  # must have same number of dims as mask
-    filter_zero = None  # set the threshold for filtering out patches where labels is mostly zero
+    optional_params = []
 
-    data_plane = None
-    train_dims = None
-    train_patch_overlap = None
-    infer_dims = None
-    infer_patch_overlap = None
-    augment_train_data = None
-    label_interp = None
-    mask_weights = None
-    metrics = None
+    class Params:
+        def __init__(self, my_yaml_path):
+            self.update(my_yaml_path)  # load parameters
+            self.check()  # check parameters
+            self.params_path = my_yaml_path  # path to param file stored here
 
-    norm_data = None
-    norm_labels = None
-    norm_mode = None
+        def save(self, my_yaml_path):
+            """Saves parameters to yml file"""
+            with open(my_yaml_path, 'w') as f:
+                yaml.dump(self.__dict__, f, indent=4)
 
-    model_name = None
-    base_filters = None
-    output_filters = None
-    layer_layout = None
-    final_layer = None
-    kernel_size = None
-    data_format = None
-    activation = None
-    mixed_precision = None
-    dist_strat = None
+        def update(self, my_yaml_path):
+            """Loads parameters from yml file"""
+            with open(my_yaml_path) as f:
+                params = yaml.load(f, Loader=yaml.SafeLoader)
+                self.__dict__.update(params)
 
-    shuffle_size = None
-    batch_size = None
-    num_threads = None
-    samples_per_epoch = None
-    train_fract = None
-    learning_rate = None
-    learning_rate_decay = None
-    loss = None
-    optimizer = None
-    num_epochs = None
-    dropout_rate = None
-
-    def __init__(self, json_path):
-        self.update(json_path)
-        self.check()
-
-    def save(self, json_path):
-        """Saves parameters to json file"""
-        with open(json_path, 'w') as f:
-            json.dump(self.__dict__, f, indent=4)
-
-    def update(self, json_path):
-        """Loads parameters from json file"""
-        with open(json_path) as f:
-            params = json.load(f)
-            self.__dict__.update(params)
-
-    def check(self):
-        """Checks that all required parameters are defined in params.json file"""
-        member_val = [getattr(self, attr) for attr in dir(self) if
-                      not callable(getattr(self, attr)) and not attr.startswith("__")]
-        members = [attr for attr in dir(self) if not callable(getattr(self, attr)) and not attr.startswith("__")]
-        if any([member is None for member in member_val]):
-            raise ValueError(
-                "Missing the following parameter(s) in params.json: "
-                + " ".join([attr for attr in members if getattr(self, attr) is None]))
-
-    @property
-    def dict(self):
-        """Gives dict-like access to Params instance by `params.dict['learning_rate']`"""
-        return self.__dict__
+        def check(self):
+            """Checks that all required parameters are defined in params.yml file"""
+            members = [attr for attr in dir(self) if not callable(getattr(self, attr)) and not attr.startswith("__")]
+            if any([param not in members for param in required_params]):
+                missing = [param for param in required_params if param not in members]
+                raise ValueError("Missing the following parameter(s) in parameter file: {}".format(" ".join(missing)))
+            # check for unused params in param file
+            all_params = required_params + optional_params
+            unused = [param for param in members if param not in all_params]
+            if unused:
+                raise ValueError("The following parameters in param file are not used: {}".format(" ".join(unused)))
+    return Params(yaml_path)
 
 
-def set_logger(log_path):
+def set_logger(log_path, level=logging.INFO):
     """
     Sets the logger to log info in terminal and file `log_path`.
     In general, it is useful to have a logger so that every output to the terminal is saved
-    in a permanent file. Here we save it to `model_dir/train.log`.
+    in a permanent file.
     Example:
     ```
     logging.info("Starting training...")
     ```
     Args:
         log_path: (string) where to log
+        level: (int) the logging level
     """
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    logger.setLevel(level)
 
     if not logger.handlers:
-        # Logging to a file
-        file_handler = logging.FileHandler(log_path)
-        file_handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s: %(message)s'))
-        logger.addHandler(file_handler)
-
         # Logging to console
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(logging.Formatter('%(message)s'))
         logger.addHandler(stream_handler)
 
+        # Logging to a file
+        if log_path and os.path.isdir(os.path.dirname(log_path)):
+            file_handler = logging.FileHandler(log_path)
+            file_handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s: %(message)s'))
+            logger.addHandler(file_handler)
+            logger.info("Created log file at {}".format(log_path))
+        else:
+            logger.info("Logging to console only")
 
-def save_dict_to_json(d, json_path):
-    """
-    Saves dict of floats in json file
-    Args:
-        d: (dict) of float-castable values (np.float, int, float, etc.)
-        json_path: (string) path to json file
-    """
-    with open(json_path, 'w') as f:
-        # We need to convert the values to float for json (it doesn't accept np.array, np.float, )
-        d = {k: float(v) for k, v in d.items()}
-        json.dump(d, f, indent=4)
+    return logger
 
 
-def display_tf_dataset(dataset_data, data_format, data_dims, weighted=False):
+# utility function to get all study subdirectories in a given parent data directory
+# returns shuffled directory list using user defined randomization seed
+# saves a copy of output to study_dirs_list.yml in study directory
+def get_study_dirs(params, change_basedir=None):
+
+    # Study dirs yml filename setup
+    study_dirs_filepath = os.path.join(params.model_dir, 'study_dirs_list.yml')
+
+    # load study dirs file if it already exists for consistent training
+    if os.path.isfile(study_dirs_filepath):
+        logging.info("Loading existing study directories file: {}".format(study_dirs_filepath))
+        with open(study_dirs_filepath) as f:
+            study_dirs = yaml.load(f, Loader=yaml.SafeLoader)
+
+        # check that study_dirs_list format is correct
+        if not all([item in study_dirs.keys() for item in ["train", "eval", "test"]]):
+            raise ValueError("study_dirs_list.yml must contain entries for train, eval, and test")
+
+        # loop through train, eval, test
+        for key in ["train", "eval", "test"]:
+
+            # handle change_basedir argument
+            if change_basedir:
+                # get rename list of directories
+                study_dirs[key] = [os.path.join(change_basedir, os.path.basename(os.path.dirname(item))) for item in
+                                   study_dirs[key]]
+                if not all([os.path.isdir(d) for d in study_dirs[key]]):
+                    logging.error("Using change basedir argument but not all {} directories exist".format(key))
+                    # get list of missing files
+                    missing = []
+                    for item in study_dirs[key]:
+                        if not os.path.isdir(item):
+                            missing.append(item)
+                    raise FileNotFoundError("Missing the following {} directories: {}".format(', '.join(missing), key))
+
+            # make sure that study directories loaded from file actually exist and warn/error if some/all do not
+            valid_study_dirs = []
+            for study in study_dirs[key]:
+                # get list of all expected files via glob
+                files = [glob("{}/*{}.nii.gz".format(study, item)) for item in params.data_prefix + params.label_prefix]
+                # check that a file was found and that file exists in each case
+                if all(files) and all([os.path.isfile(f[0]) for f in files]):
+                    valid_study_dirs.append(study)
+            # case, no valid study dirs
+            if not valid_study_dirs:
+                logging.info(" -No valid {} directories found".format(key))
+            # case, less valid study dirs than found in study dirs file
+            elif len(valid_study_dirs) < len(study_dirs[key]):
+                logging.warning(
+                    " -Some {} directories listed in study_dirs_list.yml are missing or incomplete".format(key))
+            # case, all study dirs in study dirs file are valid
+            else:
+                logging.info(" -All {} directories listed in study_dirs_list.yml are present and complete".format(key))
+            study_dirs[key] = valid_study_dirs
+
+    # if study dirs file does not exist, then determine study directories and create study_dirs_list.yml
+    else:
+        logging.info("Determining train/test split based on params and available study directories in data directory")
+        # get all valid subdirectories in data_dir
+        study_dirs = [item for item in glob(params.data_dir + '/*/') if os.path.isdir(item)]
+        # make sure all necessary files are present in each folder
+        study_dirs = [study for study in study_dirs if all(
+            [glob('{}/*{}.nii.gz'.format(study, item)) and os.path.isfile(glob('{}/*{}.nii.gz'.format(study, item))[0])
+             for item in params.data_prefix + params.label_prefix])]
+        # error if no valid study dirs found
+        assert len(study_dirs) >= 1, "No valid Study directories found in data directory: {} using prefixes: {}".format(
+            params.data_dir, params.data_prefix + params.label_prefix)
+
+        # study dirs sorted in alphabetical order for reproducible results
+        study_dirs.sort()
+
+        # randomly shuffle input directories for training using a user defined randomization seed
+        random.Random(params.random_state).shuffle(study_dirs)
+
+        # do train eval split
+        train_dirs, eval_dirs = train_test_split(study_dirs, params)
+        study_dirs = {"train": train_dirs, "eval": eval_dirs, "test": []}
+
+        # save directory list to yml file so it can be loaded in future
+        with open(study_dirs_filepath, 'w+', encoding='utf-8') as f:
+            yaml.dump(study_dirs, f)  # save study dir list for consistency
+
+    return study_dirs
+
+
+# split list of all valid study directories into a train and test batch based on train fraction
+def train_test_split(study_dirs, params):
+    # first train fraction is train dirs, last 1-train fract is test dirs
+    # assumes study dirs is already shuffled and/or stratified as wanted
+    train_dirs = study_dirs[0:int(np.floor(params.train_fract * len(study_dirs)))]
+    eval_dirs = study_dirs[int(np.floor(params.train_fract * len(study_dirs))):]
+
+    return train_dirs, eval_dirs
+
+
+def display_tf_dataset(dataset_data, data_format, data_dims):
     """
     Displays tensorflow dataset output images and labels/regression images.
     :param dataset_data: (tf.tensor) output from tf dataset function containing images and labels/regression image
     :param data_format: (str) the desired tensorflow data format. Must be either 'channels_last' or 'channels_first'
     :param data_dims: (list or tuple of ints) the data dimensions that come out of the input function
-    :param weighted: (bool) whether or not the labels slice includes weights as the final channel dimension
     :return: displays images for 3 seconds then continues
     """
 
@@ -198,8 +289,6 @@ def display_tf_dataset(dataset_data, data_format, data_dims, weighted=False):
         # determine n plots and channels
         nplots = image_data.shape[-1] + 1
         channels = image_data.shape[-1]
-        if weighted:
-            nplots += 1
 
         # loop through channels
         for z in range(channels):
@@ -222,34 +311,13 @@ def display_tf_dataset(dataset_data, data_format, data_dims, weighted=False):
             if data_format == 'channels_first':
                 label_data = np.transpose(label_data, [1, 2, 3, 0])
 
-        # handle weights
-        weights = None
-        if weighted:
-            weights = label_data[..., [-1]]  # last channel is weights
-            label_data = label_data[..., [0]]  # use first channel for labes
-
-        # add to fig
-        if weighted:
-            # handle labels first
-            ax = fig.add_subplot(1, nplots, nplots-1)
-            label_img = np.squeeze(label_data)
-            inds = [label_img.shape[0] * label_img.shape[2], label_img.shape[1]]
-            label_img = np.reshape(np.transpose(label_img), inds)
-            ax.imshow(label_img, cmap='gray')
-            ax.set_title('Labels')
-            # finally handle weights
-            ax = fig.add_subplot(1, nplots, nplots)
-            weight_img = np.reshape(np.transpose(weights), inds)
-            ax.imshow(weight_img, cmap='gray')
-            ax.set_title('Weights')
-        else:
-            # handle labels only
-            ax = fig.add_subplot(1, nplots, nplots)
-            label_img = np.squeeze(label_data)
-            inds = [label_img.shape[0] * label_img.shape[2], label_img.shape[1]]
-            label_img = np.reshape(np.transpose(label_img), inds)
-            ax.imshow(label_img, cmap='gray')
-            ax.set_title('Labels')
+        # add labels to fig
+        ax = fig.add_subplot(1, nplots, nplots)
+        label_img = np.squeeze(label_data)
+        inds = [label_img.shape[0] * label_img.shape[2], label_img.shape[1]]
+        label_img = np.reshape(np.transpose(label_img), inds)
+        ax.imshow(label_img, cmap='gray')
+        ax.set_title('Labels')
 
     # start timer and show plot
     timer.start()

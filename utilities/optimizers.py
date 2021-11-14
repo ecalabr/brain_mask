@@ -1,11 +1,32 @@
+"""
+Allows user to choose a specific optimizer using a string in parameter file
+"""
+
 import tensorflow as tf
 
 
-# get built in locals
-start_globals = list(globals().keys())
+class Optimizers:
+    methods = {}
+
+    def __init__(self, params):
+        self.optimizer = params.optimizer
+        if self.optimizer not in self.methods:
+            raise ValueError(
+                "Specified optimizer: '{}' is not an available method: {}".format(self.optimizer, self.methods))
+
+    def __call__(self):
+        return self.methods[self.optimizer]()
+
+    @classmethod
+    def register_method(cls, name):
+        def decorator(method):
+            cls.methods[name] = method
+            return method
+        return decorator
 
 
 # regular adam
+@Optimizers.register_method("adam")
 def adam():
     return tf.keras.optimizers.Adam(
         learning_rate=0.001,
@@ -18,6 +39,7 @@ def adam():
 
 
 # AMSgrad variant of adam
+@Optimizers.register_method("amsgrad")
 def amsgrad():
     return tf.keras.optimizers.Adam(
         learning_rate=0.001,
@@ -30,6 +52,7 @@ def amsgrad():
 
 
 # stochastic gradient descent
+@Optimizers.register_method("sgd")
 def sgd():
     return tf.keras.optimizers.SGD(
         learning_rate=0.01,
@@ -37,20 +60,3 @@ def sgd():
         nesterov=False,
         name='SGD'
     )
-
-
-def optimizer_picker(params):
-
-    # get optimizer string
-    optimizer = params.optimizer
-
-    # sanity checks
-    if not isinstance(optimizer, str):
-        raise ValueError("Optimizer parameter must be a string")
-
-    # check for specified loss method and error if not found
-    if optimizer.lower() in globals():
-        return globals()[optimizer]()
-    else:
-        methods = [k for k in globals().keys() if k not in start_globals]
-        raise NotImplementedError("Specified optimizer: '{}' is not an available method: {}".format(optimizer, methods))

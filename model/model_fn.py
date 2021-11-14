@@ -1,9 +1,14 @@
-from model.net_builder import net_builder
-from utilities.losses import loss_picker
-from utilities.optimizers import optimizer_picker
+"""
+Creates a tensorflow model based on a set of parameters
+"""
+
+from model.networks import Networks
+from utilities.losses import Losses
+from utilities.optimizers import Optimizers
 import tensorflow as tf
 import os
 from contextlib import redirect_stdout
+from tensorflow.keras.mixed_precision import experimental as mixed_precision
 
 
 def model_fn(params):
@@ -13,7 +18,7 @@ def model_fn(params):
     if not isinstance(metrics, (list, tuple)):
         metrics = list(metrics)
 
-    # handle distribution strategy if not already defined
+    # handle distribution strategy
     if not hasattr(params, 'strategy'):
         if params.dist_strat and params.dist_strat.lower() == 'mirrored':
             params.strategy = tf.distribute.MirroredStrategy()
@@ -22,11 +27,25 @@ def model_fn(params):
         # set global batch size to batch size * num replicas
         params.batch_size = params.batch_size * params.strategy.num_replicas_in_sync
 
+    # handle mixed precision
+    if params.mixed_precision:  # enable mixed precision and warn user
+        print("WARNING: using tensorflow mixed precision... This could lead to numeric instability in some cases.")
+        params.policy = mixed_precision.Policy('mixed_float16')
+        # warn if batch size and/or nfilters is not a multpile of 8
+        if not params.base_filters % 8 == 0:
+            print("WARNING: parameter base_filters is not a multiple of 8, which will not use tensor cores.")
+        if not params.batch_size % 8 == 0:
+            print("WARNING: parameter batch_size is not a multiple of 8, which will not use tensor cores.")
+    else:  # if not using mixed precision, then assume float32
+        params.policy = mixed_precision.Policy('float32')
+    # set default policy, subsequent per layer dtype can be specified
+    mixed_precision.set_policy(params.policy)  # default policy for layers
+
     # Define model and loss using loss picker function
     with params.strategy.scope():  # use distribution strategy scope
-        model = net_builder(params)
-        loss = loss_picker(params)
-        optimzer = optimizer_picker(params)
+        model = Networks(params)()
+        loss = Losses(params)()
+        optimzer = Optimizers(params)()
         model.compile(optimizer=optimzer, loss=loss, metrics=metrics)
 
     # save text representation of graph

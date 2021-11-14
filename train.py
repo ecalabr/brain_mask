@@ -9,37 +9,14 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0 = INFO, 1 = WARN, 2 = ERROR, 3 = F
 logging.getLogger('tensorflow').setLevel(logging.ERROR)
 import tensorflow as tf
 from tensorflow.keras.callbacks import LearningRateScheduler, ModelCheckpoint, TensorBoard
-from utilities.utils import Params
-from utilities.utils import set_logger
-from utilities.patch_input_fn import patch_input_fn
-from utilities.learning_rates import learning_rate_picker
+from utilities.utils import load_param_file, set_logger, get_study_dirs
+from utilities.input_functions import InputFunctions
+from utilities.learning_rates import LearningRates
 from model.model_fn import model_fn
 
 
 # define functions
-def train(param_file):
-
-    # load params from param file
-    params = Params(param_file)
-
-    # determine model dir
-    if params.model_dir == 'same':  # this allows the model dir to be inferred from params.json file path
-        params.model_dir = os.path.dirname(param_file)
-    if not os.path.isdir(params.model_dir):
-        raise ValueError("Specified model directory does not exist: {}".format(params.model_dir))
-
-    # Set the logger, delete old log file if overwrite param is set to yes
-    train_dir = os.path.join(params.model_dir, 'train')
-    if not os.path.isdir(train_dir):
-        os.mkdir(train_dir)
-    log_path = os.path.join(train_dir, 'train.log')
-    if os.path.isfile(log_path) and params.overwrite:
-        os.remove(log_path)
-    set_logger(log_path)
-    logging.info("Using model directory {}".format(params.model_dir))
-    logging.info("Using logging file {}".format(log_path))
-    logging.info("Using TensorFlow version {}".format(tf.__version__))
-
+def train(params):
     # Make sure data directory exists
     if not os.path.isdir(params.data_dir):
         raise ValueError("Specified data directory does not exist: {}".format(params.data_dir))
@@ -76,9 +53,13 @@ def train(param_file):
     else:
         completed_epochs = 0
 
+    # generate directories
+    study_dirs = get_study_dirs(params)  # returns a dict of "train", "eval", and "test"
+
     # generate dataset objects for model inputs
-    train_inputs = patch_input_fn(params, mode='train')
-    eval_inputs = patch_input_fn(params, mode='eval')
+    input_fn = InputFunctions(params)()
+    train_inputs = input_fn(mode='train', data_dirs=study_dirs["train"])
+    eval_inputs = input_fn(mode='eval', data_dirs=study_dirs["eval"])
 
     # Check for existing model and load if exists, otherwise create from scratch
     if latest_ckpt and not params.overwrite:
@@ -94,7 +75,7 @@ def train(param_file):
     # SET CALLBACKS FOR TRAINING FUNCTION
 
     # define learning rate schedule callback for model
-    learning_rate = LearningRateScheduler(learning_rate_picker(params.learning_rate, params.learning_rate_decay))
+    learning_rate = LearningRateScheduler(LearningRates(params)())
 
     # checkpoint save callback
     if not os.path.isdir(checkpoint_path):
@@ -147,13 +128,41 @@ def train(param_file):
 if __name__ == '__main__':
     # parse input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-p', '--param_file', default=None,
+    parser.add_argument('-p', '--param_file', default=None, type=str,
                         help="Path to params.json")
+    parser.add_argument('-l', '--logging', default=2, type=int, choices=[1, 2, 3, 4, 5],
+                        help="Set logging level: 1=DEBUG, 2=INFO, 3=WARN, 4=ERROR, 5=CRITICAL")
+    parser.add_argument('-x', '--overwrite', default=False,
+                        help="Overwrite existing data.",
+                        action='store_true')
 
     # Load the parameters from the experiment params.json file in model_dir
     args = parser.parse_args()
     assert args.param_file, "Must specify a parameter file using --param_file"
     assert os.path.isfile(args.param_file), "No json configuration file found at {}".format(args.param_file)
 
+    # load params from param file
+    my_params = load_param_file(args.param_file)
+
+    # set global random seed for tensorflow operations
+    tf.random.set_seed(my_params.random_state)
+
+    # determine model dir
+    if my_params.model_dir == 'same':  # this allows the model dir to be inferred from params.json file path
+        my_params.model_dir = os.path.dirname(args.param_file)
+    if not os.path.isdir(my_params.model_dir):
+        raise ValueError("Specified model directory does not exist: {}".format(my_params.model_dir))
+
+    # handle logging argument
+    train_dir = os.path.join(my_params.model_dir, 'train')
+    if not os.path.isdir(train_dir):
+        os.mkdir(train_dir)
+    log_path = os.path.join(train_dir, 'train.log')
+    if os.path.isfile(log_path) and args.overwrite:
+        os.remove(log_path)
+    logger = set_logger(log_path, level=args.logging * 10)
+    logging.info("Using model directory {}".format(my_params.model_dir))
+    logging.info("Using TensorFlow version {}".format(tf.__version__))
+
     # do work
-    train(args.param_file)
+    train(my_params)

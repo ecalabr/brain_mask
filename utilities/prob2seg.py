@@ -1,4 +1,6 @@
-""" converts one or more 4D probabilty image(s) into a binary mask using softmax argmax """
+"""
+Converts one or more probabilty image(s) into a binary mask.
+"""
 
 import nibabel as nib
 import os
@@ -7,6 +9,7 @@ import numpy as np
 import scipy.ndimage
 from glob import glob
 import logging
+from utilities.utils import set_logger
 
 
 # define functions
@@ -93,10 +96,10 @@ def create_superellipse_mask(shape, o=2.5, v=0.9):
 
 def convert_prob(files, nii_out_path, clean, thresh=0.5, n_seg=1, zero_periph=True, order=2.5):
     # set up logger
-    logger = logging.getLogger("brain_mask")
+    convert_logger = logging.getLogger()
 
     # announce files
-    logger.info("Found the following probability file: {}".format(' '.join(files)))
+    convert_logger.info("Found the following probability file: {}".format(' '.join(files)))
 
     # load data
     data = []
@@ -142,7 +145,7 @@ def convert_prob(files, nii_out_path, clean, thresh=0.5, n_seg=1, zero_periph=Tr
         data = scipy.ndimage.morphology.binary_fill_holes(data)  # fill holes
         data = scipy.ndimage.morphology.binary_closing(data, structure=struct)  # final closing
     except Exception:
-        logger.error("Mask generation failed... Skipping...")
+        convert_logger.error("Mask generation failed... Skipping...")
         if clean:
             for f in files:
                 os.remove(f)
@@ -165,25 +168,38 @@ if __name__ == '__main__':
 
     # parse input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data', default=None,
+    parser.add_argument('-d', '--data', default=None,
                         help="Path to data image(s). Can be an image or a directory.")
-    parser.add_argument('--name', default='',
+    parser.add_argument('-n', '--name', default='',
                         help="Name of data image(s). Any string within the data filename. " +
                              "Leave blank for all images, which will be averaged.")
-    parser.add_argument('--outname', default='binary_mask.nii.gz',
+    parser.add_argument('-o', '--outname', default='binary_mask.nii.gz',
                         help="Name of output image")
-    parser.add_argument('--outpath', default=None,
+    parser.add_argument('-p', '--out_dir', default=None,
                         help="Output path")
-    parser.add_argument('--clean', action="store_true", default=False,
+    parser.add_argument('-c', '--clean', action="store_true", default=False,
                         help="Delete inputs after conversion")
+    parser.add_argument('-x', '--overwrite', default=False,
+                        help="Overwrite existing data.",
+                        action='store_true')
+    parser.add_argument('-l', '--logging', default=2, type=int, choices=[1, 2, 3, 4, 5],
+                        help="Set logging level: 1=DEBUG, 2=INFO, 3=WARN, 4=ERROR, 5=CRITICAL")
+    args = parser.parse_args()
+
+    # handle logging argument
+    log_path = None
+    if args.out_dir:
+        log_path = os.path.join(args.out_dir, 'prob2seg.log')
+        if os.path.isfile(log_path) and args.overwrite:
+            os.remove(log_path)
+    logger = set_logger(log_path, level=args.logging * 10)
 
     # check input arguments
-    args = parser.parse_args()
     data_in_path = args.data
     assert data_in_path, "Must specify input data using --data"
     namestr = args.name
     outname = args.outname
-    outpath = args.outpath
+    out_dir = args.out_dir
     if '.nii.gz' not in outname:
         outname = outname.split('.')[0] + '.nii.gz'
     my_files = []
@@ -192,14 +208,14 @@ if __name__ == '__main__':
         my_files = [data_in_path]
         data_root = os.path.dirname(data_in_path)
     elif os.path.isdir(data_in_path):
-        my_files = glob(data_in_path + '/*' + namestr + '*.nii*')
+        my_files = glob(data_in_path + '/*' + namestr + '*.nii.gz')
         data_root = data_in_path
     else:
         raise ValueError("No data found at {}".format(data_in_path))
 
     # handle outpath creation and make sure output file is not an input
-    if outpath and os.path.isdir(outpath):
-        data_root = outpath
+    if out_dir and os.path.isdir(out_dir):
+        data_root = out_dir
     my_nii_out_path = os.path.join(data_root, outname)
     if my_nii_out_path in my_files:
         my_files.remove(my_nii_out_path)
@@ -207,6 +223,10 @@ if __name__ == '__main__':
     # announce
     if not my_files:
         raise ValueError("No data found at {}".format(data_in_path))
+
+    # check overwrite
+    if os.path.isfile(my_nii_out_path) and not args.overwrite:
+        raise ValueError("Output nii {} exists and overwrite argument is false".format(my_nii_out_path))
 
     # do work
     final_nii_out = convert_prob(my_files, my_nii_out_path, args.clean)

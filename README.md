@@ -56,7 +56,7 @@ The "-i" flag specifies the input directory. The script automatically finds any 
 NOTE: image data must have series suffixes that correspond to the model being used, i.e. "example001_flair.nii.gz".
 
 TO USE DIFFERENT SUFFIXES YOU CAN EITHER:
-1. Edit the json file in the corresponding "trained_models" directory (data_prefix).
+1. Edit the yaml file in the corresponding "trained_models" directory (data_prefix).
 2. Use the "-n" or "-names" argument followed by the list of suffixes, in order, corresponding to the expected model suffixes.
 
 For example, the following command would execute the 4 contrast masking, but instead of looking for the suffixes t1, t1c, t2, and flair, it would look for T1, T1gad, T2, and FLAIR (note that suffixes are case sensitive):
@@ -66,6 +66,8 @@ python brain_mask.py -m t1-t1c-t2-flair -i example_data -n T1 T1gad T2 FLAIR
 ```
 
 ### Additional optional arguments
+The "-h" flag will list all arguments and give additional information on what they do.
+
 The "-s" flag can be used to specify an output suffix (default  is "brain_mask").
 
 The "-t" flag is used to set the probability threshold for masking. Values >0.5 will result in more conservative masks, and <0.5 will result in more liberal masks.
@@ -77,12 +79,12 @@ The "-x" flag is used to overwrite existing data.
 The "-f" flag is used to force CPU execution in case you cannot use a GPU (this will be slower). This can also be used to overcome GPU memory limitations.
 
 ### Image dimension considerations
-If your input images are larger than 256 cubed, you may want to adjust the "infer_dims" parameter of the json file in the corresponding "trained_models" directory. If infer dims is smaller than the input, then masking will be done in chunks and the result will be stitched together. Larger chunks use more memory and are slower. Smaller chunks are faster and use less memory, but will result in stitching artifact if smaller than the input image. You can also adjust the "infer_patch_overlap" parameter to reduce stitch artifact, but high overlap will make memory usage grow very rapidly.
+If your input images are larger than 256 cubed, you may want to adjust the "infer_dims" parameter of the yaml file in the corresponding "trained_models" directory. If infer dims is smaller than the input, then masking will be done in chunks and the result will be stitched together. Larger chunks use more memory and are slower. Smaller chunks are faster and use less memory, but will result in stitching artifact if smaller than the input image. You can also adjust the "infer_patch_overlap" parameter to reduce stitch artifact, but high overlap will make memory usage grow very rapidly.
 
 ## Train
 The following command will train the network using the parameters specified in the specified param file (see examples in the included "example_data" directory):
 ```bash
-python train.py -p brain_mask_params.json
+python train.py -p brain_mask_params.yml
 ```
 For help with parameter files, please refer to a separate markdown in this subdirectory named "params_help.md".
 
@@ -91,5 +93,5 @@ Training outputs will be located in the model directory as specified in the para
 ## Predict
 The following command will use the trained T1c model weights "last" checkpoint (-c) to predict for a single patient (-s) with ID 123456:
 ```bash
-python predict.py -p brain_mask/trained_models/T1c/T1c.json -s data_dir/123456 -c "last"
+python predict.py -p brain_mask/trained_models/T1c/T1c.yml -s data_dir/123456 -c "last"
 ```

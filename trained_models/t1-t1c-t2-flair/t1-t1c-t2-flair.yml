@@ -1,0 +1,48 @@
+---
+data_dir: example_data
+model_dir: same
+overwrite: False
+random_state: 42
+
+data_prefix: [t1, t1c, t2, flair]
+label_prefix: [brain_mask]
+mask_prefix: [brain_mask]
+mask_dilate: [80, 80, 80]
+filter_zero: 0
+
+input_function: PatchInputFn3D
+data_plane: ax
+train_dims: [80, 80, 80]
+train_patch_overlap: [2, 2, 2]
+infer_dims: [256, 256, 256]
+infer_patch_overlap: [1, 1, 1]
+augment_train_data: True
+label_interp: 0
+
+norm_data: True
+norm_labels: False
+norm_mode: zscore
+
+model_name: Unet3dBneck
+base_filters: 32
+output_filters: 1
+layer_layout: [3, 4, 4]
+final_layer: sigmoid
+kernel_size: [3, 3, 3]
+data_format: channels_last
+activation: leaky_relu
+mixed_precision: False
+dist_strat: none
+
+shuffle_size: 1000
+batch_size: 8
+samples_per_epoch: 20000
+num_threads: 4
+train_fract: 1.0
+learning_rate: [0.001, 12, 0.5]
+learning_rate_decay: simple_step
+optimizer: adam
+loss: combo_loss3d
+metrics: [bce]
+num_epochs: 20
+dropout_rate: 0.3
