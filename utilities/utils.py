@@ -20,57 +20,62 @@ def load_param_file(yaml_path):
     params.learning_rate = 0.5  # change the value of learning_rate in params
     """
 
-    required_params = [
-        "data_dir",
-        "model_dir",
-        "overwrite",
-        "random_state",
-        "data_prefix",
-        "label_prefix",
-        "mask_prefix",
-        "mask_dilate",
-        "filter_zero",
-        "input_function",
-        "data_plane",
-        "train_dims",
-        "train_patch_overlap",
-        "infer_dims",
-        "infer_patch_overlap",
-        "augment_train_data",
-        "label_interp",
-        "metrics",
-        "norm_data",
-        "norm_labels",
-        "norm_mode",
-        "model_name",
-        "base_filters",
-        "output_filters",
-        "layer_layout",
-        "final_layer",
-        "kernel_size",
-        "data_format",
-        "activation",
-        "mixed_precision",
-        "dist_strat",
-        "shuffle_size",
-        "batch_size",
-        "num_threads",
-        "samples_per_epoch",
-        "train_fract",
-        "learning_rate",
-        "learning_rate_decay",
-        "loss",
-        "optimizer",
-        "num_epochs",
-        "dropout_rate"
-    ]
+    required_params = {
+        "data_dir":  {"type": str},
+        "model_dir":  {"type": str},
+        "overwrite":  {"type": bool},
+        "random_state":  {"type": int},
+        "data_prefix":  {"type": list, "subtype": str},
+        "label_prefix":  {"type": list, "subtype": str},
+        "mask_prefix":  {"type": list, "subtype": str},
+        "mask_dilate":  {"type": list, "subtype": int, "length": [1, 2, 3]},
+        "filter_zero":  {"type": (int, float)},
+        "input_function":  {"type": str},
+        "data_plane":  {"type": str},
+        "train_dims":  {"type": list, "subtype": int, "length": [2, 3]},
+        "train_patch_overlap":  {"type": list, "subtype": (int, float), "length": [2, 3]},
+        "infer_dims":  {"type": list, "subtype": int, "length": [2, 3]},
+        "infer_patch_overlap":  {"type": list, "subtype": (int, float), "length": [2, 3]},
+        "augment_train_data":  {"type": bool},
+        "label_interp":  {"type": int},
+        "metrics":  {"type": list, "subtype": str},
+        "norm_data":  {"type": bool},
+        "norm_labels":  {"type": bool},
+        "norm_mode":  {"type": str},
+        "model_name":  {"type": str},
+        "base_filters":  {"type": int},
+        "output_filters":  {"type": int},
+        "layer_layout":  {"type": list, "subtype": int},
+        "final_layer":  {"type": str},
+        "kernel_size":  {"type": list, "subtype": int, "length": [2, 3]},
+        "data_format":  {"type": str},
+        "activation":  {"type": str},
+        "mixed_precision":  {"type": bool},
+        "dist_strat":  {"type": str},
+        "shuffle_size":  {"type": int},
+        "batch_size":  {"type": int},
+        "num_threads":  {"type": int},
+        "samples_per_epoch":  {"type": int},
+        "train_fract":  {"type": float},
+        "learning_rate":  {"type": list, "subtype": (int, float)},
+        "learning_rate_decay":  {"type": str},
+        "loss":  {"type": str},
+        "optimizer":  {"type": str},
+        "num_epochs":  {"type": int},
+        "dropout_rate":  {"type": float}
+    }
 
-    optional_params = []
+    optional_params = {}
 
     class Params:
         def __init__(self, my_yaml_path):
             self.update(my_yaml_path)  # load parameters
             self.check()  # check parameters
+            # handle "same" argument for model_dir
+            if self.model_dir == 'same':  # this allows the model dir to be inferred from params.json file path
+                self.model_dir = os.path.dirname(my_yaml_path)
+            if not os.path.isdir(self.model_dir):
+                raise FileNotFoundError(f"Specified model_dir {self.model_dir} does not exist!")
             self.params_path = my_yaml_path  # path to param file stored here
 
         def save(self, my_yaml_path):
@@ -86,12 +91,40 @@ def load_param_file(yaml_path):
 
         def check(self):
             """Checks that all required parameters are defined in params.yml file"""
+            # get all attributes
             members = [attr for attr in dir(self) if not callable(getattr(self, attr)) and not attr.startswith("__")]
+            # check for missing required params
             if any([param not in members for param in required_params]):
                 missing = [param for param in required_params if param not in members]
                 raise ValueError("Missing the following parameter(s) in parameter file: {}".format(" ".join(missing)))
+            # check params for type, length, subtype, etc
+            for attr in members:
+                # check for primary type
+                t = required_params[attr]["type"]
+                if not isinstance(getattr(self, attr), t):
+                    raise ValueError(
+                        "Required parameter {} must be {} but is {}".format(attr, t, type(getattr(self, attr))))
+                # check for length
+                if "length" in required_params[attr]:
+                    length = len(getattr(self, attr))
+                    req_length = required_params[attr]["length"]
+                    if length not in req_length:
+                        raise ValueError(
+                            "Required parameter {} must have length {} but length is {}".format(attr, length,
+                                                                                                req_length))
+                # check for secondary type
+                if "subtype" in required_params[attr]:
+                    elems = [elem for elem in getattr(self, attr)]
+                    req_subtypes = required_params[attr]["subtype"]
+                    if not all([isinstance(elem, req_subtypes) for elem in elems]):
+                        subtypes = [type(elem) for elem in elems]
+                        raise ValueError(
+                            "Every element in required parameter {} must be {} but types are {}".format(attr,
+                                                                                                        req_subtypes,
+                                                                                                        subtypes))
+
             # check for unused params in param file
-            all_params = required_params + optional_params
+            all_params = {**required_params, **optional_params}
             unused = [param for param in members if param not in all_params]
             if unused:
                 raise ValueError("The following parameters in param file are not used: {}".format(" ".join(unused)))

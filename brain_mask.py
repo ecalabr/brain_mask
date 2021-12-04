@@ -71,13 +71,7 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thres
                 continue
 
         # run predict on one directory and get the output probabilities
-        try:
-            prob = predict(params, [direc], out_dir[n], mask=None, checkpoint='last')  # direc must be list
-        except Exception as ex:
-            bm_logger.info("Prediction failed for study {}, most likely due to GPU memory exhaustion."
-                           " See debug logger for details.".format(direc))
-            bm_logger.info(ex)
-            continue
+        prob = predict(params, [direc], out_dir[n], mask=None, checkpoint='last')  # direc must be list
 
         # convert probs to mask with cleanup
         nii_out_path = convert_prob(prob,

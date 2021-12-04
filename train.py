@@ -17,23 +17,25 @@ from model.model_fn import model_fn
 
 # define functions
 def train(params):
+    # logging
+    train_logger = logging.getLogger()
     # Make sure data directory exists
     if not os.path.isdir(params.data_dir):
         raise ValueError("Specified data directory does not exist: {}".format(params.data_dir))
-    logging.info("Using data directory {}".format(params.data_dir))
+    train_logger.info("Using data directory {}".format(params.data_dir))
 
     # determine distribution strategy for multi GPU training
     if params.dist_strat.lower() == 'mirrored':
-        logging.info("Using Mirrored distribution strategy")
+        train_logger.info("Using Mirrored distribution strategy")
         params.strategy = tf.distribute.MirroredStrategy()
         # adjust batch size and learning rate to compensate for mirrored replicas
         # batch size is multiplied by num replicas
         params.batch_size = params.batch_size * params.strategy.num_replicas_in_sync
-        logging.info(
+        train_logger.info(
             "Batch size adjusted to {} for {} replicas".format(params.batch_size, params.strategy.num_replicas_in_sync))
         # initial learning rate is multiplied by squre root of replicas
         # params.learning_rate[0] = params.learning_rate[0] * np.sqrt(params.strategy.num_replicas_in_sync)
-        # logging.info(
+        # train_logger.info(
         #     "Initial learning rate adjusted by a factor of {} (root {} for {} replicas)".format(
         #         np.sqrt(params.strategy.num_replicas_in_sync), params.strategy.num_replicas_in_sync,
         #         params.strategy.num_replicas_in_sync))
@@ -49,7 +51,7 @@ def train(params):
     if checkpoints and not params.overwrite:
         latest_ckpt = max(checkpoints, key=os.path.getctime)
         completed_epochs = int(os.path.splitext(os.path.basename(latest_ckpt).split('epoch_')[1])[0].split('_')[0])
-        logging.info("Checkpoint exists for epoch {}".format(completed_epochs))
+        train_logger.info("Checkpoint exists for epoch {}".format(completed_epochs))
     else:
         completed_epochs = 0
 
@@ -57,19 +59,19 @@ def train(params):
     study_dirs = get_study_dirs(params)  # returns a dict of "train", "eval", and "test"
 
     # generate dataset objects for model inputs
-    input_fn = InputFunctions(params)()
-    train_inputs = input_fn(mode='train', data_dirs=study_dirs["train"])
-    eval_inputs = input_fn(mode='eval', data_dirs=study_dirs["eval"])
+    input_fn = InputFunctions(params)
+    train_inputs = input_fn.get_dataset(data_dirs=study_dirs["train"], mode="train")
+    eval_inputs = input_fn.get_dataset(data_dirs=study_dirs["eval"], mode="eval")
 
     # Check for existing model and load if exists, otherwise create from scratch
     if latest_ckpt and not params.overwrite:
-        logging.info("Creating the model to resume checkpoint")
+        train_logger.info("Creating the model to resume checkpoint")
         model = model_fn(params)  # recreating model from scratech may be neccesary if custom loss function is used
-        logging.info("Loading model weights checkpoint file {}".format(latest_ckpt))
+        train_logger.info("Loading model weights checkpoint file {}".format(latest_ckpt))
         model.load_weights(latest_ckpt)
     else:
         # Define the model from scratch
-        logging.info("Creating the model...")
+        train_logger.info("Creating the model...")
         model = model_fn(params)
 
     # SET CALLBACKS FOR TRAINING FUNCTION
@@ -109,7 +111,7 @@ def train(params):
     train_callbacks = [learning_rate, checkpoint, tensorboard]
 
     # TRAINING
-    logging.info("Training for {} total epochs starting at epoch {}".format(params.num_epochs, completed_epochs + 1))
+    train_logger.info("Training for {} total epochs starting at epoch {}".format(params.num_epochs, completed_epochs + 1))
     model.fit(
         train_inputs,
         epochs=params.num_epochs,
@@ -119,7 +121,7 @@ def train(params):
         validation_data=eval_inputs,
         shuffle=False,
         verbose=1)
-    logging.info(
+    train_logger.info(
         "Successfully trained model for {} epochs ({} total epochs)".format(params.num_epochs - completed_epochs,
                                                                             params.num_epochs))
 
@@ -147,12 +149,6 @@ if __name__ == '__main__':
     # set global random seed for tensorflow operations
     tf.random.set_seed(my_params.random_state)
 
-    # determine model dir
-    if my_params.model_dir == 'same':  # this allows the model dir to be inferred from params.json file path
-        my_params.model_dir = os.path.dirname(args.param_file)
-    if not os.path.isdir(my_params.model_dir):
-        raise ValueError("Specified model directory does not exist: {}".format(my_params.model_dir))
-
     # handle logging argument
     train_dir = os.path.join(my_params.model_dir, 'train')
     if not os.path.isdir(train_dir):
@@ -161,8 +157,8 @@ if __name__ == '__main__':
     if os.path.isfile(log_path) and args.overwrite:
         os.remove(log_path)
     logger = set_logger(log_path, level=args.logging * 10)
-    logging.info("Using model directory {}".format(my_params.model_dir))
-    logging.info("Using TensorFlow version {}".format(tf.__version__))
+    logger.info("Using model directory {}".format(my_params.model_dir))
+    logger.info("Using TensorFlow version {}".format(tf.__version__))
 
     # do work
     train(my_params)

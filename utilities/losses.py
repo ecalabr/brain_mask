@@ -25,33 +25,21 @@ class Losses:
         return decorator
 
 
-# generalized DICE loss for 2D and 3D networks
-@Losses.register_method("dice_loss")
-def dice_loss(y_true, y_pred):
-    numerator = 2 * tf.reduce_sum(y_true * y_pred, axis=(1, 2, 3))
-    denominator = tf.reduce_sum(y_true + y_pred, axis=(1, 2, 3))
-    return 1 - numerator / denominator
+# generalized DICE loss
+@Losses.register_method("dice")
+def dice(y_t, y_p):
+    numerator = 2 * tf.reduce_sum(y_t * y_p, axis=(1, 2, 3, 4))
+    denominator = tf.reduce_sum(y_t + y_p, axis=(1, 2, 3, 4))
+    return tf.reshape(1 - (numerator / denominator), (-1, 1, 1, 1))
 
 
-# combo dice and binary cross entropy for use with mirrored strategy
+# sum of dice and binary cross entropy for use with mirrored strategy
 @Losses.register_method("combo_loss3d_mirrored")
-def combo_loss3d_mirrored(y_true, y_pred):
-    def dice_l(y_t, y_p):
-        numerator = 2 * tf.reduce_sum(y_t * y_p, axis=(1, 2, 3, 4))
-        denominator = tf.reduce_sum(y_t + y_p, axis=(1, 2, 3, 4))
-        return tf.reshape(1 - numerator / denominator, (-1, 1, 1, 1))
-
-    return tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM)(y_true, y_pred) + dice_l(y_true,
-                                                                                                                y_pred)
+def combo_loss3d_mirrored(y_t, y_p):
+    return tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM)(y_t, y_p) + dice(y_t, y_p)
 
 
-# combo dice and binary cross entropy
+# sum of dice and binary cross entropy
 @Losses.register_method("combo_loss3d")
-def combo_loss3d(y_true, y_pred):
-    def dice_l(y_t, y_p):
-        numerator = 2 * tf.reduce_sum(y_t * y_p, axis=(1, 2, 3, 4))
-        denominator = tf.reduce_sum(y_t + y_p, axis=(1, 2, 3, 4))
-        return tf.reshape(1 - numerator / denominator, (-1, 1, 1, 1))
-
-    return tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.AUTO)(y_true, y_pred) + dice_l(y_true,
-                                                                                                                 y_pred)
+def combo_loss3d(y_t, y_p):
+    return tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.AUTO)(y_t, y_p) + dice(y_t, y_p)

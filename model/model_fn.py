@@ -5,18 +5,21 @@ Creates a tensorflow model based on a set of parameters
 from model.networks import Networks
 from utilities.losses import Losses
 from utilities.optimizers import Optimizers
+from utilities.metrics import Metrics
 import tensorflow as tf
 import os
 from contextlib import redirect_stdout
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 
 
+# model function
 def model_fn(params):
 
-    # metrics
+    # get metrics
     metrics = params.metrics
     if not isinstance(metrics, (list, tuple)):
         metrics = list(metrics)
+    metrics = Metrics(metrics, params).get_metrics()
 
     # handle distribution strategy
     if not hasattr(params, 'strategy'):

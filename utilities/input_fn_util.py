@@ -269,6 +269,7 @@ def _affine_transform_roi(image, roi, labels=None, affine=None, dilate=None, ord
         affine = _create_affine()
 
     # get input tight bbox shape
+    roi = np.squeeze(roi)  # squeeze out singleton channel dimension from data loading
     roi_bbox = _nonzero_slice_inds3d(roi)
 
     # dilate if necessary
@@ -291,10 +292,7 @@ def _affine_transform_roi(image, roi, labels=None, affine=None, dilate=None, ord
     # Apply affine to roi
     roi = ndi.interpolation.affine_transform(roi, affine, offset=offset, order=0, output=np.float32,
                                              output_shape=out_shape)
-    # Apply affine to labels if given
-    if labels is not None:
-        labels = ndi.interpolation.affine_transform(labels, affine, offset=offset, order=order, output=np.float32,
-                                                    output_shape=out_shape)
+
     # Apply affine to image, accouting for possible 4d image
     if len(image.shape) > 3:
         # make 4d identity matrix and replace xyz component with 3d affine
@@ -304,9 +302,14 @@ def _affine_transform_roi(image, roi, labels=None, affine=None, dilate=None, ord
         out_shape4d = np.append(out_shape, image.shape[-1])
         image = ndi.interpolation.affine_transform(image, affine4d, offset=offset4d, order=1, output=np.float32,
                                                    output_shape=out_shape4d)
+        out_shape4d = np.append(out_shape, labels.shape[-1])
+        labels = ndi.interpolation.affine_transform(labels, affine4d, offset=offset4d, order=order, output=np.float32,
+                                                    output_shape=out_shape4d)
     else:
         image = ndi.interpolation.affine_transform(image, affine, offset=offset, order=1, output=np.float32,
                                                    output_shape=out_shape)
+        labels = ndi.interpolation.affine_transform(labels, affine, offset=offset, order=order, output=np.float32,
+                                                    output_shape=out_shape)
 
     # crop to rotated input ROI, adjusting for dilate
     nzi = _nonzero_slice_inds3d(roi)
@@ -314,11 +317,9 @@ def _affine_transform_roi(image, roi, labels=None, affine=None, dilate=None, ord
         nzi = _expand_region(roi.shape, nzi, dilate)
     roi = roi[nzi[0]:nzi[1], nzi[2]:nzi[3], nzi[4]:nzi[5]]
     image = image[nzi[0]:nzi[1], nzi[2]:nzi[3], nzi[4]:nzi[5]]
-    if labels is not None:
-        labels = labels[nzi[0]:nzi[1], nzi[2]:nzi[3], nzi[4]:nzi[5]]
-        return image, roi, labels
-    else:
-        return image, roi
+    labels = labels[nzi[0]:nzi[1], nzi[2]:nzi[3], nzi[4]:nzi[5]]
+
+    return image, roi, labels
 
 
 def _nonzero_slice_inds3d(input_numpy):
@@ -389,10 +390,26 @@ def _zero_pad_image(input_data, out_dims, axes):
     return input_data
 
 
+def _tf_pad_up(tensor, patch_size):
+    """
+    Function to symmetrically zero pad a tensor up to a specific shape
+    Args:
+        tensor: (tf.tensor) the input tensor to pad
+        patch_size: (list of 3 ints) the desired output shape for x y z respectively
+    Returns: (tf.tensor) the zero padded tensor with x y z shape == patch_size
+
+    """
+    in_s = tf.shape(tensor)  # get full shape of data tensor
+    out_s = [in_s[0]] + patch_size + [in_s[-1]]  # desired shape is same as data tensor for batch and chan
+    pads = [[tf.math.floor((m - in_s[i]) / 2), tf.math.ceil((m - in_s[i]) / 2)] for (i, m) in enumerate(out_s)]
+    pads = tf.cast(tf.nn.relu(pads), tf.int32)  # remove negative paddings
+    return tf.pad(tensor, pads, "CONSTANT", constant_values=0)
+
+
 ##############################################
 # TENSORFLOW MAP FUNCTIONS
 ##############################################
-def tf_patches_3d(data, labels, patch_size, data_format, data_chan, label_chan=1, overlap=1, weighted=False):
+def tf_patches_3d(data, labels, patch_size, data_format, data_chan, label_chan=1, overlap=1):
     """
     Extract 3D patches from a data array with overlap if desired
     :param data: (numpy array) the data tensorflow tensor
@@ -402,7 +419,6 @@ def tf_patches_3d(data, labels, patch_size, data_format, data_chan, label_chan=1
     :param data_chan: (int) the number of channels in the feature data
     :param label_chan: (int) the number of channels in the label data
     :param overlap: (int or list/tuple of ints) the divisor for patch strides - determines the patch overlap in x, y
-    :param weighted: (bool) weather or not the labels data includes a weight tensor as the last element of labels
     :return: returns tensorflow tensor patches
     """
 
@@ -421,17 +437,18 @@ def tf_patches_3d(data, labels, patch_size, data_format, data_chan, label_chan=1
         data = tf.transpose(a=data, perm=[0, 2, 3, 4, 1])
         labels = tf.transpose(a=labels, perm=[0, 2, 3, 4, 1])
 
-    # for sliding window 3d slabs
+    # get sliding window size and strides based on user params
     ksizes = [1] + patch_size + [1]
     strides = [1, patch_size[0] / overlap[0], patch_size[1] / overlap[1], patch_size[2] / overlap[2], 1]
     strides = [int(round(item)) for item in strides]
 
     # make patches
-    data = tf.extract_volume_patches(data, ksizes=ksizes, strides=strides, padding='VALID')
+    data = _tf_pad_up(data, patch_size)  # pad up to at least patch size or VALID patching won't return anything
+    data = tf.extract_volume_patches(data, ksizes=ksizes, strides=strides, padding='VALID')  # SAME does weird stuff
     data = tf.reshape(data, [-1] + patch_size + [data_chan])
-    labels = tf.extract_volume_patches(labels, ksizes=ksizes, strides=strides, padding='VALID')
-    # if weighted is true, then add 1 to label_chan for the weights tensor that should be concatenated here
-    labels = tf.reshape(labels, [-1] + patch_size + [label_chan + 1 if weighted else label_chan])
+    labels = _tf_pad_up(labels, patch_size)  # pad up to at least patch size or VALID patching won't return anything
+    labels = tf.extract_volume_patches(labels, ksizes=ksizes, strides=strides, padding='VALID')  # SAME does weird stuff
+    labels = tf.reshape(labels, [-1] + patch_size + [label_chan])
 
     # handle channels first
     if data_format == 'channels_first':
@@ -441,53 +458,11 @@ def tf_patches_3d(data, labels, patch_size, data_format, data_chan, label_chan=1
     return data, labels
 
 
-def tf_patches_3d_infer(data, patch_size, chan_dim, data_format, overlap=1):
-    """
-    Extract 3D patches from a data array with overlap if desired - no labels, used for inference
-    :param data: (numpy array) the data tensorflow tensor
-    :param patch_size: (list or tupe of ints) the patch dimensions
-    :param chan_dim:  (int) the number of data channels
-    :param data_format: (str) either channels_last or channels_first - the tensorflow data format
-    :param overlap: (int) the divisor for patch strides - determines the patch overlap in x, y (default no overlap)
-    :return: returns tensorflow tensor patches
-    """
-
-    # sanity checks
-    if not len(patch_size) == 3:
-        raise ValueError("Patch size must be shape 3 to use 3D patch function but is: " + str(patch_size))
-
-    # handle overlap int vs list/tuple
-    if not isinstance(overlap, (np.ndarray, int, list, tuple)):
-        raise ValueError("Overlap must be a list, tuple, array, or int.")
-    if isinstance(overlap, int):
-        overlap = [overlap] * 3
-
-    # handle channels first
-    if data_format == 'channels_first':
-        data = tf.transpose(a=data, perm=[0, 2, 3, 4, 1])
-
-    # for sliding window 3d slabs
-    ksizes = [1] + patch_size + [1]
-    strides = [1, patch_size[0] / overlap[0], patch_size[1] / overlap[1], patch_size[2] / overlap[2], 1]
-    strides = [int(round(item)) for item in strides]
-
-    # make patches
-    data = tf.extract_volume_patches(data, ksizes=ksizes, strides=strides, padding='SAME')
-    data = tf.reshape(data, [-1] + patch_size + [chan_dim])
-
-    # handle channels first
-    if data_format == 'channels_first':
-        data = tf.transpose(a=data, perm=[0, 4, 1, 2, 3])
-
-    return data
-
-
-def filter_zero_patches(labels, data_format, mode, thresh=0.05):
+def filter_zero_patches(labels, data_format, thresh=0.05):
     """
     Filters out patches that contain mostly zeros in the label data. Works for 3D and 2D patches.
     :param labels: (tf.tensor) containing labels data (uses only first channel currently)
     :param data_format: (str) either 'channels_first' or 'channels_last' - the tensorflow data format
-    :param mode: (str) either '2D' '2.5D' or '3D' - the mode for training
     :param thresh: (float) the threshold percentage for keeping patches. Default is 5%.
     :return: Returns tf.bool False if less than threshold, else returns tf.bool True
     """
@@ -495,25 +470,11 @@ def filter_zero_patches(labels, data_format, mode, thresh=0.05):
         return tf.constant(True, dtype=tf.bool)
 
     if data_format == 'channels_last':
-        # handle channels last - use entire slice if 2D, use entire slab if 3D or 2.5D
-        if mode == '2.5D':  # [x, y, z, c]
-            labels = labels[:, :, int(round(labels.get_shape()[2] / 2.)), 0]
-        elif mode == '2D':  # [x, y, c]
-            labels = labels[:, :, 0]
-        elif mode == '3D':  # [x, y, z, c]
-            labels = labels[:, :, :, 0]
-        else:
-            raise ValueError("Mode must be 2D, 2.5D, or 3D but is: " + str(mode))
+        # handle channels last
+        labels = labels[:, :, :, 0]
     else:
-        # handle channels first - use entire slice if 2D, use entire slab if 3D or 2.5D
-        if mode == '2.5D':  # [c, x, y, z]
-            labels = labels[0, :, :, int(round(labels.get_shape()[2] / 2.))]
-        elif mode == '2D':  # [c, x, y]
-            labels = labels[0, :, :]
-        elif mode == '3D':  # [c, x, y, z]
-            labels = labels[0, :, :, :]
-        else:
-            raise ValueError("Labels shape must be 2D or 3D but is: " + str((labels.get_shape())))
+        # handle channels first
+        labels = labels[0, :, :, :]
 
     # make threshold a tf tensor for comparisson
     thr = tf.constant(thresh, dtype=tf.float32)
@@ -522,7 +483,7 @@ def filter_zero_patches(labels, data_format, mode, thresh=0.05):
 
 
 ##############################################
-# PY FUNC DATA FUNCTIONS
+# Low level data loaders
 ##############################################
 class LoadRoiMulticonAndLabels3D:
     """
@@ -538,54 +499,36 @@ class LoadRoiMulticonAndLabels3D:
         # convert bytes to strings and get relevant params
         study_dir = _byte_convert(study_dir)
         params = self.params
-        feature_prefx = params.data_prefix
+        feat_prefx = params.data_prefix
         label_prefx = params.label_prefix
-        dilate = params.mask_dilate
         mask_prefx = params.mask_prefix
+        dilate = params.mask_dilate
         plane = params.data_plane
-        data_fmt = params.data_format
+        dfmt = params.data_format
         aug = params.augment_train_data
         interp = params.label_interp
-        norm = params.norm_data
-        norm_mode = params.norm_mode
-        norm_lab = params.norm_labels
+        dnorm = params.norm_data
+        lnorm = params.norm_labels
+        mode = params.norm_mode
 
         # sanity checks
         if plane not in ['ax', 'cor', 'sag']:
             raise ValueError("Did not understand specified plane: " + str(plane))
-        if data_fmt not in ['channels_last', 'channels_first']:
+        if dfmt not in ['channels_last', 'channels_first']:
             raise ValueError("Did not understand specified data_fmt: " + str(plane))
 
-        # define full paths
-        data_files = [glob(study_dir + '/*' + contrast + '.nii.gz')[0] for contrast in feature_prefx]
-        labels_file = glob(study_dir + '/*' + label_prefx[0] + '.nii.gz')[0]
+        # load data
+        data = _load_single_study(study_dir, feat_prefx, data_format=dfmt, plane=plane, norm=dnorm, norm_mode=mode)
+
+        # load labels
+        labels = _load_single_study(study_dir, label_prefx, data_format=dfmt, plane=plane, norm=lnorm, norm_mode=mode)
+
+        # load the mask and handle None mask argument (in which case whole image is used)
         if mask_prefx:
-            mask_file = glob(study_dir + '/*' + mask_prefx[0] + '.nii.gz')[0]
+            mask = _load_single_study(study_dir, mask_prefx, data_format=dfmt, plane=plane, norm=False, norm_mode=mode)
         else:
-            mask_file = data_files[0]
-        if not all([os.path.isfile(img) for img in data_files + [labels_file] + [mask_file]]):
-            raise ValueError("One or more of the input data/labels/mask files does not exist")
-
-        # load the mask and get the full data dims - handle None mask argument (in which case whole image is used)
-        if mask_prefx:
-            mask = nib.load(mask_file).get_fdata()
-        else:
-            mask = np.ones_like(nib.load(mask_file).get_fdata(), dtype=np.float32)
-        data_dims = mask.shape
-
-        # load data and normalize
-        data = np.empty((data_dims[0], data_dims[1], data_dims[2], len(data_files)), dtype=np.float32)
-        for i, im_file in enumerate(data_files):
-            if norm:
-                data[:, :, :, i] = Normalizers(norm_mode)(nib.load(im_file).get_fdata())
-            else:
-                data[:, :, :, i] = nib.load(im_file).get_fdata()
-
-        # load labels with NORMALIZATION - add option for normalized vs non-normalized labels here
-        if norm_lab:
-            labels = Normalizers(norm_mode)(nib.load(labels_file).get_fdata())
-        else:
-            labels = nib.load(labels_file).get_fdata()
+            mask_dims = data.shape[:-1] if dfmt == "channels_last" else data.shape[1:]
+            mask = np.ones(mask_dims)
 
         # center the ROI in the image usine affine, with optional rotation for data augmentation
         if aug:  # if augmenting, select random rotation values (+/- 30 deg) for each of x, y, and z axes
@@ -608,7 +551,7 @@ class LoadRoiMulticonAndLabels3D:
 
         # add batch and channel dims as necessary to get to [batch, x, y, z, channel]
         data = np.expand_dims(data, axis=0)  # add a batch dimension of 1
-        labels = np.expand_dims(labels, axis=(0, 4))  # add a batch and channel dimension of 1
+        labels = np.expand_dims(labels, axis=0)  # add a batch and channel dimension of 1
 
         # handle different planes
         if plane == 'ax':
@@ -623,14 +566,52 @@ class LoadRoiMulticonAndLabels3D:
             raise ValueError("Did not understand specified plane: " + str(plane))
 
         # handle channels first data format
-        if data_fmt == 'channels_first':
+        if dfmt == 'channels_first':
             data = np.transpose(data, axes=[0, 4, 1, 2, 3])
             labels = np.transpose(labels, axes=[0, 4, 1, 2, 3])
 
         return data.astype(np.float32), labels.astype(np.float32)
 
 
-class LoadMulticonPreserveSize3D:
+class LoadMulticonAndLabels3D:
+    """
+    Load multicontrast image data and labels without cropping or otherwise adjusting size.
+    For use with testing.
+    """
+    def __init__(self, params):
+        self.params = params
+
+    def load(self, study_dir):
+
+        # get relevant params
+        study_dir = _byte_convert(study_dir)
+        params = self.params
+        feat_prefx = params.data_prefix
+        label_prefx = params.label_prefix
+        dfmt = params.data_format
+        plane = params.data_plane
+        dnorm = params.norm_data
+        lnorm = params.norm_labels
+        mode = params.norm_mode
+
+        # sanity checks
+        if not os.path.isdir(study_dir):
+            raise ValueError("Specified study_directory does not exist")
+        if dfmt not in ['channels_last', 'channels_first']:
+            raise ValueError("data_format invalid")
+
+        # load multi-contrast data and normalize, no slice trimming for infer data
+        data = _load_single_study(study_dir, feat_prefx, data_format=dfmt, plane=plane, norm=dnorm, norm_mode=mode)
+        labels = _load_single_study(study_dir, label_prefx, data_format=dfmt, plane=plane, norm=lnorm, norm_mode=mode)
+
+        # generate batch size==1 format such that format is [1, x, y, z, c] or [1, c, x, y, z]
+        data = np.expand_dims(data, axis=0)
+        labels = np.expand_dims(labels, axis=0)
+
+        return data, labels
+
+
+class LoadMulticon3D:
     """
     Load multicontrast image data without cropping or otherwise adjusting size. For use with inference/prediction.
     """
@@ -651,8 +632,6 @@ class LoadMulticonPreserveSize3D:
         # sanity checks
         if not os.path.isdir(study_dir):
             raise ValueError("Specified study_directory does not exist")
-        if not all([isinstance(a, str) for a in feat_prefx]):
-            raise ValueError("Data prefixes must be strings")
         if data_fmt not in ['channels_last', 'channels_first']:
             raise ValueError("data_format invalid")
 
@@ -663,7 +642,8 @@ class LoadMulticonPreserveSize3D:
         # generate batch size==1 format such that format is [1, x, y, z, c] or [1, c, x, y, z]
         data = np.expand_dims(data, axis=0)
 
-        return data
+        # retun an empty value for "labels" so that
+        return data, np.empty_like(data)
 
 
 ##############################################
@@ -702,7 +682,7 @@ def reconstruct_infer_patches_3d(predictions, infer_dir, params):
         return tape.gradient(_y, _x, output_gradients=y) / grad
 
     # load original data as a dummy and convert channel dim size to match output [batch, x, y, z, channel]
-    data = LoadMulticonPreserveSize3D(params).load(infer_dir)
+    data, _ = LoadMulticon3D(params).load(infer_dir)
     data = np.zeros((data.shape[0:4] + (params.output_filters,)), dtype=np.float32)
 
     # get shape of patches as they would have been generated during inference

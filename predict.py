@@ -103,8 +103,7 @@ def predict(params, pred_dirs, out_dir, mask=None, checkpoint='last', cpu=False,
         # if output doesn't already exist, then predict and make nii
         if not os.path.isfile(pred_out) or overwrite:
             # Create the inference dataset structure
-            input_function = InputFunctions(params)()
-            infer_inputs = input_function(mode='infer', data_dirs=pred_dir)
+            infer_inputs = InputFunctions(params).get_dataset(data_dirs=[pred_dir], mode="infer")
             # predict
             predictions = model.predict(infer_inputs)
             # save nii
@@ -151,7 +150,7 @@ if __name__ == '__main__':
         if os.path.isfile(log_path) and args.overwrite:
             os.remove(log_path)
     logger = set_logger(log_path, level=args.logging * 10)
-    logging.info("Using paraneter file {}".format(args.param_file))
+    logging.info("Using parameter file {}".format(args.param_file))
     logging.info("Using TensorFlow version {}".format(tf.__version__))
 
     # handle param argument
@@ -161,11 +160,6 @@ if __name__ == '__main__':
     # turn of distributed strategy and mixed precision
     my_params.dist_strat = None
     my_params.mixed_precision = False
-    # determine model dir
-    if my_params.model_dir == 'same':  # this allows the model dir to be inferred from params.json file path
-        my_params.model_dir = os.path.dirname(args.param_file)
-    if not os.path.isdir(my_params.model_dir):
-        raise ValueError("Specified model directory does not exist")
 
     # handle out_dir argument
     if args.out_dir:
