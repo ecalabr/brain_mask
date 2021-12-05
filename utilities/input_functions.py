@@ -45,6 +45,9 @@ class PatchInputFn3D:
         # error if mode is not specified
         assert mode, "Mode not specified for get_dataset call"
 
+        # cache params so they can be restored later
+        self.params.save_state()
+
         # set variables that are the same for all modes
         data_chan = len(self.params.data_prefix)
         label_chan = self.params.output_filters
@@ -125,5 +128,8 @@ class PatchInputFn3D:
         # repeat dataset infinitely for train mode only
         if repeat:
             dataset = dataset.repeat()
+
+        # restore any changed params
+        self.params.load_state()
 
         return dataset

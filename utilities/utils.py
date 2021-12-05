@@ -77,11 +77,26 @@ def load_param_file(yaml_path):
             if not os.path.isdir(self.model_dir):
                 raise FileNotFoundError(f"Specified model_dir {self.model_dir} does not exist!")
             self.params_path = my_yaml_path  # path to param file stored here
+            self.saved_state = {}
 
         def save(self, my_yaml_path):
             """Saves parameters to yml file"""
             with open(my_yaml_path, 'w') as f:
                 yaml.dump(self.__dict__, f, indent=4)
+
+        def save_state(self):
+            """Save current params state for restoring later"""
+            attrs = [attr for attr in dir(self) if not callable(getattr(self, attr)) and not attr.startswith("__")]
+            # dont cache saved_state
+            if "saved_state" in attrs:
+                attrs.remove("saved_state")
+            self.saved_state = {attr: getattr(self, attr) for attr in attrs}
+
+        def load_state(self):
+            """Loads parameter state saved in self.save_state"""
+            for attr in self.saved_state:
+                setattr(self, attr, self.saved_state[attr])
+            self.saved_state = {}
 
         def update(self, my_yaml_path):
             """Loads parameters from yml file"""
