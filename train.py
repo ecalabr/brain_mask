@@ -111,7 +111,7 @@ def train(params):
     train_callbacks = [learning_rate, checkpoint, tensorboard]
 
     # TRAINING
-    train_logger.info("Training for {} total epochs starting at epoch {}".format(params.num_epochs, completed_epochs + 1))
+    train_logger.info(f"Training for {params.num_epochs} total epochs starting at epoch {completed_epochs + 1}")
     model.fit(
         train_inputs,
         epochs=params.num_epochs,

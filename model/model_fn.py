@@ -9,7 +9,7 @@ from utilities.metrics import Metrics
 import tensorflow as tf
 import os
 from contextlib import redirect_stdout
-from tensorflow.keras.mixed_precision import experimental as mixed_precision
+from tensorflow.keras import mixed_precision
 
 
 # model function
@@ -42,7 +42,7 @@ def model_fn(params):
     else:  # if not using mixed precision, then assume float32
         params.policy = mixed_precision.Policy('float32')
     # set default policy, subsequent per layer dtype can be specified
-    mixed_precision.set_policy(params.policy)  # default policy for layers
+    mixed_precision.set_global_policy(params.policy)  # default policy for layers
 
     # Define model and loss using loss picker function
     with params.strategy.scope():  # use distribution strategy scope

@@ -4,6 +4,7 @@ Allows a user to choose a specific evaluation metric using a string in parameter
 
 import tensorflow as tf
 
+
 class Metrics:
     methods = {}
 

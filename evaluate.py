@@ -38,7 +38,9 @@ def evaluate(params):
 
     # load model from specified checkpoint
     eval_logger.info("Creating the model to resume checkpoint")
-    model = model_fn(params)  # recreating model from scratech may be neccesary if custom loss function is used
+    # net_builder input layer uses train_dims, so set these to infer dims to allow different size inference
+    params.train_dims = params.infer_dims
+    model = model_fn(params)  # recreating model from scratch may be neccesary if custom loss function is used
     eval_logger.info("Loading model weights checkpoint file {}".format(params.checkpoint))
     model.load_weights(params.checkpoint)
 

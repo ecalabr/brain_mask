@@ -95,7 +95,7 @@ class Unet3dBneck:
             for layer in range(n_layers):
                 x = bneck_resid3d(x, self.params)
 
-        # output layer - no mixed precision data policy
+        # output layer - always force float32 on final layer reguardless of mixed precision
         if self.params.final_layer == "conv":
             x = Conv3D(filters=output_filt, kernel_size=[1, 1, 1], padding='same', data_format=dfmt, dtype='float32')(x)
         elif self.params.final_layer == "sigmoid":
