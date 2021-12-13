@@ -52,7 +52,6 @@ class PatchInputFn3D:
         data_chan = len(self.params.data_prefix)
         label_chan = self.params.output_filters
         dfmt = self.params.data_format
-        filt_zero = self.params.filter_zero
         threads = self.params.num_threads
         shuffle_size = self.params.shuffle_size
         repeat = False  # infinitely repeat dataset
@@ -116,8 +115,8 @@ class PatchInputFn3D:
         # flatten out dataset so that each entry is a single patch and associated label
         dataset = dataset.flat_map(lambda x, y: tf.data.Dataset.from_tensor_slices((x, y)))
         # filter out zero patches
-        if filt_zero > 0.:
-            dataset = dataset.filter(lambda x, y: filter_zero_patches(y, dfmt, filt_zero))
+        if self.params.filter_zero > 0.:
+            dataset = dataset.filter(lambda x, y: filter_zero_patches(y, dfmt, self.params.filter_zero))
         # shuffle a set number of exampes (only if shuffle is true
         if shuffle:
             dataset = dataset.shuffle(buffer_size=shuffle_size)

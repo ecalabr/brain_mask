@@ -1,25 +1,25 @@
 ---
-data_dir: example_data
+data_dir: example_datas
 model_dir: same
-overwrite: True
+overwrite: False
 random_state: 42
 
 data_prefix: [cta-brain]
 label_prefix: [brain-mask-mc]
 mask_prefix: [brain-mask-mc]
-mask_dilate: [100, 100, 100]
-filter_zero: 0.
+mask_dilate: [256, 256, 256]
+filter_zero: 0.001
 
 input_function: PatchInputFn3D
 data_plane: ax
 train_dims: [80, 80, 80]
-train_patch_overlap: [2, 2, 2]
+train_patch_overlap: [4, 4, 4]
 infer_dims: [256, 256, 256]
-infer_patch_overlap: [1.5, 1.5, 1.5]
+infer_patch_overlap: [1, 1, 1]
 augment_train_data: True
 label_interp: 0
 
-norm_data: False
+norm_data: True
 norm_labels: False
 norm_mode: zscore
 
@@ -34,15 +34,15 @@ activation: leaky_relu
 mixed_precision: False
 dist_strat: none
 
-shuffle_size: 500
+shuffle_size: 1000
 batch_size: 6
 samples_per_epoch: 6000
-num_threads: 4
+num_threads: 6
 train_fract: 1.0
 learning_rate: [0.001, 12, 0.5]
 learning_rate_decay: simple_step
 optimizer: adam
 loss: combo_loss3d
-metrics: [bce]
+metrics: [bce, dice, binary_dice]
 num_epochs: 20
 dropout_rate: 0.4

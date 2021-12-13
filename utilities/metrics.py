@@ -32,13 +32,15 @@ def bce(_):
     return tf.keras.metrics.BinaryCrossentropy(from_logits=False)
 
 
-# handle dice metric
+# handle dice metric - if value is NaN (pred and labels all zero) then this will return 1s
 @Metrics.register_method("dice")
 def dice_metric(_):
     def dice(y_t, y_p):
         numerator = 2 * tf.reduce_sum(y_t * y_p, axis=(1, 2, 3, 4))
         denominator = tf.reduce_sum(y_t + y_p, axis=(1, 2, 3, 4))
-        return tf.reshape((numerator / denominator), (-1, 1, 1, 1))
+        dice_array = tf.reshape((numerator / denominator), (-1, 1, 1, 1))
+        dice_array = tf.where(tf.math.is_nan(dice_array), tf.ones_like(dice_array), dice_array)  # convert nan to 1
+        return dice_array
     return dice
 
 

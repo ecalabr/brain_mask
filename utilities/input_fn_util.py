@@ -390,20 +390,31 @@ def _zero_pad_image(input_data, out_dims, axes):
     return input_data
 
 
-def _tf_pad_up(tensor, patch_size):
+def _tf_pad_up(tensor, patch_size, strides):
     """
     Function to symmetrically zero pad a tensor up to a specific shape
     Args:
         tensor: (tf.tensor) the input tensor to pad
         patch_size: (list of 3 ints) the desired output shape for x y z respectively
-    Returns: (tf.tensor) the zero padded tensor with x y z shape == patch_size
+        strides: (list of 3 ints) the strides for the patches
+    Returns: (tf.tensor) the zero padded tensor with x y z shape that can be patched with VALID spacing
 
     """
-    in_s = tf.shape(tensor)  # get full shape of data tensor
-    out_s = [in_s[0]] + patch_size + [in_s[-1]]  # desired shape is same as data tensor for batch and chan
-    pads = [[tf.math.floor((m - in_s[i]) / 2), tf.math.ceil((m - in_s[i]) / 2)] for (i, m) in enumerate(out_s)]
-    pads = tf.cast(tf.nn.relu(pads), tf.int32)  # remove negative paddings
-    return tf.pad(tensor, pads, "CONSTANT", constant_values=0)
+    im_s = tf.cast(tf.shape(tensor), tf.float32)  # get full shape of data tensor
+    strides = tf.cast(strides, tf.float32)  # cast strides to float
+    patch_size = tf.cast(patch_size, tf.float32)  # cast patch to float
+    out_s = (tf.math.ceil((im_s - patch_size) / strides) * strides) + patch_size  # determine smallest patchable shape
+    out_s = tf.where(out_s < patch_size, patch_size, out_s)  # out shape shouldn't be smaller than patch size
+    before = tf.cast(tf.math.floor((out_s - im_s) / 2)[..., tf.newaxis], tf.int32)  # before padding
+    after = tf.cast(tf.math.ceil((out_s - im_s) / 2)[..., tf.newaxis], tf.int32)  # after padding
+    pads = tf.reshape(tf.concat([before, after], axis=-1), [5, 2])  # concatenate pads
+    return tf.pad(tensor, pads, 'CONSTANT', constant_values=0)
+
+
+def _tf_patch_3d(tensor, ksizes, strides, padding='VALID'):
+    tensor = _tf_pad_up(tensor, ksizes, strides)  # pad up to at least a multiple of patch size for VALID patching
+    tensor = tf.extract_volume_patches(tensor, ksizes=ksizes, strides=strides, padding=padding)
+    return tensor
 
 
 ##############################################
@@ -443,11 +454,9 @@ def tf_patches_3d(data, labels, patch_size, data_format, data_chan, label_chan=1
     strides = [int(round(item)) for item in strides]
 
     # make patches
-    data = _tf_pad_up(data, patch_size)  # pad up to at least patch size or VALID patching won't return anything
-    data = tf.extract_volume_patches(data, ksizes=ksizes, strides=strides, padding='VALID')  # SAME does weird stuff
+    data = _tf_patch_3d(data, ksizes, strides, padding='VALID')
     data = tf.reshape(data, [-1] + patch_size + [data_chan])
-    labels = _tf_pad_up(labels, patch_size)  # pad up to at least patch size or VALID patching won't return anything
-    labels = tf.extract_volume_patches(labels, ksizes=ksizes, strides=strides, padding='VALID')  # SAME does weird stuff
+    labels = _tf_patch_3d(labels, ksizes, strides, padding='VALID')
     labels = tf.reshape(labels, [-1] + patch_size + [label_chan])
 
     # handle channels first
@@ -668,7 +677,7 @@ def reconstruct_infer_patches_3d(predictions, infer_dir, params):
 
     # define necessary functions
     def extract_patches(x):
-        return tf.extract_volume_patches(x, ksizes=ksizes, strides=strides, padding='SAME')
+        return _tf_patch_3d(x, ksizes, strides, padding='VALID')
 
     def extract_patches_inverse(x, y):
         with tf.GradientTape(persistent=True) as tape:
