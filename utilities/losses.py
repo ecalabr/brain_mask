@@ -25,21 +25,26 @@ class Losses:
         return decorator
 
 
-# generalized DICE loss
+# stable DICE loss
 @Losses.register_method("dice")
-def dice(y_t, y_p):
-    numerator = 2 * tf.reduce_sum(y_t * y_p, axis=(1, 2, 3, 4))
-    denominator = tf.reduce_sum(y_t + y_p, axis=(1, 2, 3, 4))
+def dice_loss(y_t, y_p):
+    smooth = 1e-6
+    numerator = (2 * tf.reduce_sum(y_t * y_p, axis=(1, 2, 3, 4))) + smooth
+    denominator = tf.reduce_sum(y_t + y_p, axis=(1, 2, 3, 4)) + smooth
     return tf.reshape(1 - (numerator / denominator), (-1, 1, 1, 1))
 
 
 # sum of dice and binary cross entropy for use with mirrored strategy
 @Losses.register_method("combo_loss3d_mirrored")
 def combo_loss3d_mirrored(y_t, y_p):
-    return tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM)(y_t, y_p) + dice(y_t, y_p)
+    bce = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM)(y_t, y_p)
+    dice = dice_loss(y_t, y_p)
+    return bce + dice
 
 
 # sum of dice and binary cross entropy
 @Losses.register_method("combo_loss3d")
 def combo_loss3d(y_t, y_p):
-    return tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.AUTO)(y_t, y_p) + dice(y_t, y_p)
+    bce = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.AUTO)(y_t, y_p)
+    dice = dice_loss(y_t, y_p)
+    return bce + dice

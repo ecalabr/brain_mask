@@ -15,7 +15,6 @@ from utilities.normalizers import Normalizers
 ##############################################
 # Local data utilities
 ##############################################
-
 def _byte_convert(byte_data):
     if isinstance(byte_data, bytes):
         return byte_data.decode()
