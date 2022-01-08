@@ -1,5 +1,5 @@
 ---
-data_dir: example_datas
+data_dir: example_data
 model_dir: same
 overwrite: False
 random_state: 42

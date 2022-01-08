@@ -128,7 +128,7 @@ class PatchInputFn3D:
         if repeat:
             dataset = dataset.repeat()
 
-        # restore any changed params
+        # restore any params changed during this process
         self.params.load_state()
 
         return dataset

@@ -48,9 +48,8 @@ def predictions_2_nii(predictions, infer_dir, out_dir, params, mask=None):
     return nii_out
 
 
-# predict a batch of input directories
-def predict(params, pred_dirs, out_dir, mask=None, checkpoint='last', cpu=False, overwrite=False):
-
+# make the prediction mode
+def pred_model(params, checkpoint='last', cpu=False):
     # set up logging
     pred_logger = logging.getLogger()
 
@@ -92,6 +91,14 @@ def predict(params, pred_dirs, out_dir, mask=None, checkpoint='last', cpu=False,
         model.load_weights(ckpt)
     else:
         raise ValueError("No model checkpoints found at {}".format(checkpoint_path))
+
+    return model
+
+
+# predict a batch of input directories
+def predict(params, model, pred_dirs, out_dir, mask=None, overwrite=False):
+    # set up logging
+    pred_logger = logging.getLogger()
 
     # infer directories in a loop
     niis_out = []
@@ -217,5 +224,5 @@ if __name__ == '__main__':
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     # make predictions
-    pred = predict(my_params, study_dirs, args.out_dir, mask=args.mask, checkpoint=args.checkpoint, cpu=args.force_cpu,
-                   overwrite=args.overwrite)
+    my_model = pred_model(my_params, checkpoint=args.checkpoint, cpu=args.force_cpu)
+    pred = predict(my_params, my_model, study_dirs, args.out_dir, mask=args.mask, overwrite=args.overwrite)

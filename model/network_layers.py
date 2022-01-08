@@ -3,10 +3,8 @@ Network layers for use by networks.py.
 """
 
 import tensorflow as tf
-from tensorflow.keras.layers import BatchNormalization, Conv3D, Conv3DTranspose, Dropout, PReLU
-import tensorflow.keras.initializers as initializers
+from tensorflow.keras.layers import BatchNormalization, Conv3D, Conv3DTranspose, Dropout
 from utilities.activations import Activations
-import functools
 
 
 def bneck_resid3d(x, params):

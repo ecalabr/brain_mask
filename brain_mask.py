@@ -11,30 +11,37 @@ import argparse
 from glob import glob
 from utilities.prob2seg import convert_prob
 from utilities.utils import load_param_file, set_logger
-from predict import predict
+from predict import predict, pred_model
 
 
 # define function to make a batch of brain masks from a list of directories
-def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thresh=0.5, clean=False, names=None, n_seg=1,
-               zero_periph=True, zp_order=2.5):
+def batch_mask(infer_direcs, param_file, out_dir, suffix, checkpoint='last', overwrite=False, thresh=0.5, clean=False,
+               names=None, n_seg=1, zero_periph=True, zp_order=2.5):
+
     # set up logging
     bm_logger = logging.getLogger()
+
     # handle out_dir = None
     if out_dir is None:
         out_dir = infer_direcs
     else:
         out_dir = [out_dir] * len(infer_direcs)
+
     # ensure that infer_direcs is list
     if not isinstance(infer_direcs, (list, tuple)):
         infer_direcs = [infer_direcs]
+
     # initiate outputs
     outnames = []
     failed = []
+
     # load params
     params = load_param_file(param_file)
+
     # turn off mixed precision and distribution
     params.dist_strat = "none"
     params.mixed_precision = False
+
     # handle names argument
     if names:
         if not isinstance(names, (list, tuple)):
@@ -45,11 +52,16 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thres
         for n, o in zip(names, params.data_prefix):
             bm_logger.info("    {} --> {}".format(o, n))
         params.data_prefix = names
+
     # get model dir
     if params.model_dir == 'same':  # this allows the model dir to be inferred from params.json file path
         params.model_dir = os.path.dirname(param_file)
     if not os.path.isdir(params.model_dir):
         raise ValueError("Specified model directory does not exist")
+
+    # make predict model
+    predict_model = pred_model(params, checkpoint=checkpoint)  # CPU argument already handled
+
     # run inference and post-processing for each infer_dir
     for n, direc in enumerate(infer_direcs):
         bm_logger.info("Processing the following directory: {}".format(direc))
@@ -71,7 +83,7 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, overwrite=False, thres
                 continue
 
         # run predict on one directory and get the output probabilities
-        prob = predict(params, [direc], out_dir[n], mask=None, checkpoint='last')  # direc must be list
+        prob = predict(params, predict_model, [direc], out_dir[n])  # direc must be list
 
         # convert probs to mask with cleanup
         nii_out_path = convert_prob(prob,
@@ -125,6 +137,8 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--force_cpu', default=False,
                         help="Disable GPU and force all computation to be done on CPU.",
                         action='store_true')
+    parser.add_argument('-k', '--checkpoint', default='last',
+                        help="Can be 'best', 'last', or an hdf5 filename in the checkpoints subdirectory of model_dir")
     parser.add_argument('-l', '--logging', default=2, type=int, choices=[1, 2, 3, 4, 5],
                         help="Set logging level: 1=DEBUG, 2=INFO, 3=WARN, 4=ERROR, 5=CRITICAL")
     parser.add_argument('-c', '--components', type=int, default=1,
@@ -217,6 +231,7 @@ if __name__ == '__main__':
                                     my_param_file,
                                     args.out_dir,
                                     args.out_suffix,
+                                    checkpoint=args.checkpoint,
                                     overwrite=args.overwrite,
                                     thresh=args.thresh,
                                     clean=not args.prob,
