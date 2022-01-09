@@ -64,7 +64,8 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, checkpoint='last', ove
 
     # run inference and post-processing for each infer_dir
     for n, direc in enumerate(infer_direcs):
-        bm_logger.info("Processing the following directory: {}".format(direc))
+        # report progress
+        bm_logger.info(f"Processing directory {n + 1:03} of {len(infer_direcs):03}: {direc}")
         # make sure all required files exist in data directory, if not, skip
         skip = 0
         for suf in params.data_prefix:
