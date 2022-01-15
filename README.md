@@ -28,6 +28,22 @@ data_dir/123456/123456_t1c.nii.gz
 ```
 This is an example of a single patient image.
 
+The complete directory tree should look something like this:
+
+```
+data_dir
+│
+└───123456
+│   │   123456_t1c.nii.gz
+│   │   123456_t1.nii.gz
+│   
+└───234567
+    │   234567_t1c.nii.gz
+    │   234567_t1.nii.gz
+```
+
+Note that your data may include more or fewer series than those shown here (t1 and t1c).
+
 ### Image filename prefix and suffix
 The image file name must start with a prefix, which is typcically the patient ID (and is the same as the patient directory name) followed by a "\_" character and then a suffix, which describes the series. Everything in the filename after the first "\_" character will be treated as the prefix and everything after will be treated as the suffix.
 
@@ -77,6 +93,18 @@ The "-p" flag will output the probability image in addition to the mask.
 The "-x" flag is used to overwrite existing data.
 
 The "-f" flag is used to force CPU execution in case you cannot use a GPU (this will be slower). This can also be used to overcome GPU memory limitations.
+
+The "-k" flag is used to specify whether to use the 'best' or 'last' model checkpoint.
+
+The "-l" flag is used to specify the logging level.
+
+The "-c" flag is used to specify the number of connected components to include in the output mask (default is 1). The largest n connected components are kept.
+
+The "-z" flag is used to zero out the periphery of the predicted mask probabilities using a 3D superellipse, which may be helpful if there are artifacts at the periphery of the image.
+
+The "-y" flag is used to specify the order of the 3D superellipse used for zeroing the periphery of the probability image.
+
+The "-start", "-end", and "-list" flags can be used to skip processing of certain subdirectories. See "-h" for more details.
 
 ### Image dimension considerations
 If your input images are larger than 256 cubed, you may want to adjust the "infer_dims" parameter of the yaml file in the corresponding "trained_models" directory. If infer dims is smaller than the input, then masking will be done in chunks and the result will be stitched together. Larger chunks use more memory and are slower. Smaller chunks are faster and use less memory, but will result in stitching artifact if smaller than the input image. You can also adjust the "infer_patch_overlap" parameter to reduce stitch artifact, but high overlap will make memory usage grow very rapidly.

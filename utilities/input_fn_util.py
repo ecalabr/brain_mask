@@ -651,7 +651,9 @@ class LoadMulticon3D:
         data = np.expand_dims(data, axis=0)
 
         # retun an empty value for "labels" so that this will work with other functions
-        return data, np.empty_like(data)
+        labels = np.empty(data.shape[0:4] + (1,), dtype=np.float32)
+
+        return data, labels
 
 
 ##############################################
