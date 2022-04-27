@@ -18,7 +18,7 @@ from model.model_fn import model_fn
 
 
 # take raw predictions and convert to nifti file
-def predictions_2_nii(predictions, infer_dir, out_dir, params, mask=None):
+def predictions_2_nii(predictions, infer_dir, out_dir, params, mask=None, thresh=None):
     # set up logging
     pred_logger = logging.getLogger()
 
@@ -36,10 +36,14 @@ def predictions_2_nii(predictions, infer_dir, out_dir, params, mask=None):
         mask_img = nib.load(mask_nii).get_fdata() > 0
         predictions = np.squeeze(predictions) * mask_img
 
+    # optional probability thresholding
+    if thresh:
+        predictions = predictions > thresh
+
     # convert to nifti format and save
     model_name = os.path.basename(params.model_dir)
     nii_out = os.path.join(out_dir, name_prefix + '_predictions_' + model_name + '.nii.gz')
-    img = nib.Nifti1Image(predictions, affine)
+    img = nib.Nifti1Image(predictions.astype(np.float32), affine)
     pred_logger.info("Saving predictions to: " + nii_out)
     nib.save(img, nii_out)
     if not os.path.isfile(nii_out):
@@ -96,7 +100,7 @@ def pred_model(params, checkpoint='last', cpu=False):
 
 
 # predict a batch of input directories
-def predict(params, model, pred_dirs, out_dir, mask=None, overwrite=False):
+def predict(params, model, pred_dirs, out_dir, mask=None, overwrite=False, thresh=None):
     # set up logging
     pred_logger = logging.getLogger()
 
@@ -114,7 +118,7 @@ def predict(params, model, pred_dirs, out_dir, mask=None, overwrite=False):
             # predict
             predictions = model.predict(infer_inputs)
             # save nii
-            pred_out = predictions_2_nii(predictions, pred_dir, out_dir, params, mask=mask)
+            pred_out = predictions_2_nii(predictions, pred_dir, out_dir, params, mask=mask, thresh=thresh)
         else:
             pred_logger.info("Predictions already exist and will not be overwritten: {}".format(pred_out))
         # update list of output niis
@@ -132,7 +136,7 @@ if __name__ == '__main__':
                         help="Path to params.json")
     parser.add_argument('-d', '--data_dir', default=None,
                         help="Path to directory to generate inference from")
-    parser.add_argument('-c', '--checkpoint', default='last',
+    parser.add_argument('-c', '--checkpoint', default='last', choices=["best", "last"],
                         help="Can be 'best', 'last', or an hdf5 filename in the checkpoints subdirectory of model_dir")
     parser.add_argument('-m', '--mask', default=None,
                         help="Optionally specify a filename prefix for a mask to mask the predictions")
@@ -143,6 +147,8 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--force_cpu', default=False,
                         help="Disable GPU and force all computation to be done on CPU",
                         action='store_true')
+    parser.add_argument('-t', '--threshold', default=None, type=float, choices=list(np.arange(0, 1, 0.01)),
+                        help="Threshold probability output to create a binary mask")
     parser.add_argument('-l', '--logging', default=2, type=int, choices=[1, 2, 3, 4, 5],
                         help="Set logging level: 1=DEBUG, 2=INFO, 3=WARN, 4=ERROR, 5=CRITICAL")
     parser.add_argument('-x', '--overwrite', default=False,
@@ -225,4 +231,7 @@ if __name__ == '__main__':
 
     # make predictions
     my_model = pred_model(my_params, checkpoint=args.checkpoint, cpu=args.force_cpu)
-    pred = predict(my_params, my_model, study_dirs, args.out_dir, mask=args.mask, overwrite=args.overwrite)
+    pred = predict(my_params, my_model, study_dirs, args.out_dir,
+                   mask=args.mask,
+                   overwrite=args.overwrite,
+                   thresh=args.threshold)

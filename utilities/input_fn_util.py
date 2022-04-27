@@ -636,6 +636,7 @@ class LoadMulticon3D:
         plane = params.data_plane
         norm = params.norm_data
         norm_mode = params.norm_mode
+        chan_dim = len(params.label_prefix)
 
         # sanity checks
         if not os.path.isdir(study_dir):
@@ -650,8 +651,8 @@ class LoadMulticon3D:
         # generate batch size==1 format such that format is [1, x, y, z, c] or [1, c, x, y, z]
         data = np.expand_dims(data, axis=0)
 
-        # retun an empty value for "labels" so that this will work with other functions
-        labels = np.empty(data.shape[0:4] + (1,), dtype=np.float32)
+        # retun an empty array for "labels" so that this will work with other functions
+        labels = np.empty(data.shape[0:4] + (chan_dim,), dtype=np.float32)
 
         return data, labels
 
