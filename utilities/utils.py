@@ -30,6 +30,8 @@ def load_param_file(yaml_path):
         "mask_prefix":  {"type": list, "subtype": str},
         "mask_dilate":  {"type": list, "subtype": int, "length": [1, 2, 3]},
         "filter_zero":  {"type": (int, float)},
+        "resample_spacing": {"type": list, "subtype": (int, float), "length": [0, 1, 2, 3]},
+        "load_shape": {"type": list, "subtype": int, "length": [0, 1, 2, 3]},
         "input_function":  {"type": str},
         "data_plane":  {"type": str},
         "train_dims":  {"type": list, "subtype": int, "length": [2, 3]},
@@ -57,6 +59,7 @@ def load_param_file(yaml_path):
         "num_threads":  {"type": int},
         "samples_per_epoch":  {"type": int},
         "train_fract":  {"type": float},
+        "test_fract": {"type": float},
         "learning_rate":  {"type": list, "subtype": (int, float)},
         "learning_rate_decay":  {"type": str},
         "loss":  {"type": str},
@@ -183,6 +186,7 @@ def set_logger(log_path, level=logging.INFO):
 # utility function to get all study subdirectories in a given parent data directory
 # returns shuffled directory list using user defined randomization seed
 # saves a copy of output to study_dirs_list.yml in study directory
+# throughout this funcion train=training, val=training validation, eval=evaluation (testing) data for use in evaluate.py
 def get_study_dirs(params, change_basedir=None):
 
     # Study dirs yml filename setup
@@ -195,11 +199,11 @@ def get_study_dirs(params, change_basedir=None):
             study_dirs = yaml.load(f, Loader=yaml.SafeLoader)
 
         # check that study_dirs_list format is correct
-        if not all([item in study_dirs.keys() for item in ["train", "eval", "test"]]):
-            raise ValueError("study_dirs_list.yml must contain entries for train, eval, and test")
+        if not all([item in study_dirs.keys() for item in ["train", "val", "eval"]]):
+            raise ValueError("study_dirs_list.yml must contain entries for train, val, and eval")
 
-        # loop through train, eval, test
-        for key in ["train", "eval", "test"]:
+        # loop through train, val, eval
+        for key in ["train", "val", "eval"]:
 
             # handle change_basedir argument
             if change_basedir:
@@ -237,7 +241,7 @@ def get_study_dirs(params, change_basedir=None):
 
     # if study dirs file does not exist, then determine study directories and create study_dirs_list.yml
     else:
-        logging.info("Determining train/test split based on params and available study directories in data directory")
+        logging.info("Determining train/val/eval split based on params and study directories in data directory")
         # get all valid subdirectories in data_dir
         study_dirs = [item for item in glob(params.data_dir + '/*/') if os.path.isdir(item)]
         # make sure all necessary files are present in each folder
@@ -254,9 +258,9 @@ def get_study_dirs(params, change_basedir=None):
         # randomly shuffle input directories for training using a user defined randomization seed
         random.Random(params.random_state).shuffle(study_dirs)
 
-        # do train eval split
-        train_dirs, eval_dirs = train_test_split(study_dirs, params)
-        study_dirs = {"train": train_dirs, "eval": eval_dirs, "test": []}
+        # do train/val/eval split
+        train_dirs, val_dirs, eval_dirs = train_val_eval_split(study_dirs, params)
+        study_dirs = {"train": train_dirs, "val": val_dirs, "eval": eval_dirs}
 
         # save directory list to yml file so it can be loaded in future
         with open(study_dirs_filepath, 'w+', encoding='utf-8') as f:
@@ -266,13 +270,21 @@ def get_study_dirs(params, change_basedir=None):
 
 
 # split list of all valid study directories into a train and test batch based on train fraction
-def train_test_split(study_dirs, params):
-    # first train fraction is train dirs, last 1-train fract is test dirs
+def train_val_eval_split(study_dirs, params):
     # assumes study dirs is already shuffled and/or stratified as wanted
-    train_dirs = study_dirs[0:int(np.floor(params.train_fract * len(study_dirs)))]
-    eval_dirs = study_dirs[int(np.floor(params.train_fract * len(study_dirs))):]
+    # check for impossible splits
+    if params.test_fract >= (1 - params.train_fract):
+        raise ValueError("Parameter 'test_fract' must be less than 1-'train_fract'. Please adjust the parameter file.")
+    # get indices of different fractions
+    train_end_ind = int(np.floor(params.train_fract * len(study_dirs)))
+    val_start_ind = train_end_ind
+    eval_start_ind = int(np.ceil((1 - params.test_fract) * len(study_dirs)))
 
-    return train_dirs, eval_dirs
+    train_dirs = study_dirs[0:train_end_ind]
+    val_dirs = study_dirs[val_start_ind:eval_start_ind]
+    eval_dirs = study_dirs[eval_start_ind:]
+
+    return train_dirs, val_dirs, eval_dirs
 
 
 def display_tf_dataset(dataset_data, data_format, data_dims):

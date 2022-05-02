@@ -3,12 +3,12 @@ Utility functions for use by input_functions.py
 """
 
 import os
-import math
 from glob import glob
 import numpy as np
 import nibabel as nib
 import scipy.ndimage as ndi
 import tensorflow as tf
+import scipy.ndimage
 from utilities.normalizers import Normalizers
 
 
@@ -28,13 +28,17 @@ def _byte_convert(byte_data):
     return byte_data
 
 
-def _load_single_study(study_dir, file_prefixes, data_format, plane=None, norm=False, norm_mode='zero_mean'):
+def _load_single_study(study_dir, file_prefixes, data_format, out_res=None, out_dims=None, res_order=2, plane=None,
+                       norm=None, norm_mode='zero_mean'):
     """
     Image data I/O function for use in tensorflow Dataset map function. Takes a study directory and file prefixes and
     returns a 4D numpy array containing the image data. Performs optional slice trimming in z and normalization.
     :param study_dir: (str) the full path to the study directory
     :param file_prefixes: (str, list(str)) the file prefixes for the images to be loaded
     :param data_format: (str) the desired tensorflow data format. Must be either 'channels_last' or 'channels_first'
+    :param out_res: list(int) the desired output resolution. If none, no resampling will be done.
+    :param out_dims: list(int) the desired output dimensions. If none, no cropping/padding will be done.
+    :param out_dims: int the spline order to be used for resampling.
     :param plane: (str) The plane to load data in. Must be a string in ['ax', 'cor', 'sag']
     :param norm: (bool) whether or not to perform per dataset normalization
     :param norm_mode: (str) The method for normalization, used by normalize function.
@@ -52,21 +56,46 @@ def _load_single_study(study_dir, file_prefixes, data_format, plane=None, norm=F
 
     # get data dims
     nii = nib.load(images[0])
-    data_dims = nii.shape
+    orig_dims = nii.shape
+
+    # handle out_res
+    if out_res:
+        if len(out_res) == 1:
+            out_res = list(out_res) * 3
+        res_dims = [round((i / j) * k) for i, j, k in zip(nii.header.get_zooms()[0:3], out_res, orig_dims)]
+    else:
+        res_dims = orig_dims
+
+    # handle out_dims
+    if out_dims:
+        alloc_dims = out_dims
+    else:
+        alloc_dims = res_dims
 
     # preallocate
-    data = np.empty(data_dims + (len(images),), dtype=np.float32)
+    data = np.empty(list(alloc_dims) + [len(images)], dtype=np.float32)
 
     # load images and concatenate into a 4d numpy array
     for ind, image in enumerate(images):
         # first nii is already loaded
         if ind > 0:
             nii = nib.load(images[ind])
+        # get float data
+        img = nii.get_fdata()
+        # handle 4d data - take only first image in 4th dim
+        if len(img.shape) > 3:
+            img = np.squeeze(img[:, :, :, 0])
+        # handle resampling
+        if out_res:
+            img = scipy.ndimage.zoom(img, [i/j for i, j in zip(nii.header.get_zooms()[0:3], out_res)], order=res_order)
+        # handle cropping
+        if not list(alloc_dims) == list(img.shape)[0:3]:
+            img = _crop_pad_image(img, alloc_dims)
         # handle normalization
         if norm:
-            data[..., ind] = Normalizers(norm_mode)(nii.get_fdata())
+            data[..., ind] = Normalizers(norm_mode)(img)
         else:
-            data[..., ind] = nii.get_fdata()
+            data[..., ind] = img
 
     # permute to desired plane in format [x, y, z, channels] for tensorflow
     if plane == 'ax':
@@ -353,38 +382,38 @@ def _nonzero_slice_inds3d(input_numpy):
     return inds
 
 
-def _zero_pad_image(input_data, out_dims, axes):
+def _crop_pad_image(input_data, out_dims):
     """
-    Zero pads an input image to the specified dimensions.
+    Crops and/or pads an input image to the specified dimensions.
     :param input_data: (np.ndarray) the image data to be padded
     :param out_dims: (list(int)) the desired output dimensions for each axis.
-    :param axes: (list(int)) the axes for padding. Must have same length as out_dims
     :return: (np.ndarray) the zero padded image
     """
 
     # sanity checks
     if type(input_data) is not np.ndarray:
         raise ValueError("Input must be a numpy array")
-    if not all([np.issubdtype(val, np.integer) for val in out_dims]):
-        raise ValueError("Output dims must be a list or tuple of ints")
-    if not all([isinstance(axes, (tuple, list))] + [isinstance(val, int) for val in axes]):
-        raise ValueError("Axes must be a list or tuple of ints")
-    if not len(out_dims) == len(axes):
-        raise ValueError("Output dimensions must have same length as axes")
-    if len(axes) != len(set(axes)):
-        raise ValueError("Axes cannot contain duplicate values")
 
     # determine pad widths
-    pads = []
-    for dim in range(len(input_data.shape)):
-        pad = [0, 0]
-        if dim in axes:
-            total_pad = out_dims[axes.index(dim)] - input_data.shape[dim]
-            pad = [int(math.ceil(total_pad / 2.)), int(math.floor(total_pad / 2.))]
-        pads.append(pad)
+    crop_pads = []
+    for i, o in zip(input_data.shape, out_dims):
+        crop_pad = [int(np.ceil((o - i) / 2.)), int(np.floor((o - i) / 2.))]
+        crop_pads.append(crop_pad)
+
+    # seperate crops and pads
+    crops = [[abs(elem) for elem in item] if sum(item) < 0 else [0, 0] for item in crop_pads]
+    pads = [item if sum(item) > 0 else [0, 0] for item in crop_pads]
+
+    # crop array
+    if np.sum(crops) > 0:
+        orig_dims = input_data.shape
+        input_data = input_data[crops[0][0]:orig_dims[0] - crops[0][1],
+                                crops[1][0]:orig_dims[1] - crops[1][1],
+                                crops[2][0]:orig_dims[2] - crops[2][1]]
 
     # pad array with zeros (default)
-    input_data = np.pad(input_data, pads, 'constant')
+    if np.sum(pads) > 0:
+        input_data = np.pad(input_data, pads, 'constant')
 
     return input_data
 
@@ -510,6 +539,8 @@ class LoadRoiMulticonAndLabels3D:
         feat_prefx = params.data_prefix
         label_prefx = params.label_prefix
         mask_prefx = params.mask_prefix
+        load_res = params.resample_spacing
+        load_shape = params.load_shape
         dilate = params.mask_dilate
         plane = params.data_plane
         dfmt = params.data_format
@@ -526,14 +557,17 @@ class LoadRoiMulticonAndLabels3D:
             raise ValueError("Did not understand specified data_fmt: " + str(plane))
 
         # load data
-        data = _load_single_study(study_dir, feat_prefx, data_format=dfmt, plane=plane, norm=dnorm, norm_mode=mode)
+        data = _load_single_study(study_dir, feat_prefx, data_format=dfmt, plane=plane, norm=dnorm, norm_mode=mode,
+                                  out_res=load_res, out_dims=load_shape)
 
         # load labels
-        labels = _load_single_study(study_dir, label_prefx, data_format=dfmt, plane=plane, norm=lnorm, norm_mode=mode)
+        labels = _load_single_study(study_dir, label_prefx, data_format=dfmt, plane=plane, norm=lnorm, norm_mode=mode,
+                                    out_res=load_res, out_dims=load_shape, res_order=interp)
 
         # load the mask and handle None mask argument (in which case whole image is used)
         if mask_prefx:
-            mask = _load_single_study(study_dir, mask_prefx, data_format=dfmt, plane=plane, norm=False, norm_mode=mode)
+            mask = _load_single_study(study_dir, mask_prefx, data_format=dfmt, plane=plane, norm=False, norm_mode=mode,
+                                      out_res=load_res, out_dims=load_shape, res_order=1)
         else:
             mask_dims = data.shape[:-1] if dfmt == "channels_last" else data.shape[1:]
             mask = np.ones(mask_dims)
@@ -601,6 +635,9 @@ class LoadMulticonAndLabels3D:
         dnorm = params.norm_data
         lnorm = params.norm_labels
         mode = params.norm_mode
+        load_res = params.resample_spacing
+        load_shape = params.load_shape
+        interp = params.label_interp
 
         # sanity checks
         if not os.path.isdir(study_dir):
@@ -609,8 +646,10 @@ class LoadMulticonAndLabels3D:
             raise ValueError("data_format invalid")
 
         # load multi-contrast data and normalize, no slice trimming for infer data
-        data = _load_single_study(study_dir, feat_prefx, data_format=dfmt, plane=plane, norm=dnorm, norm_mode=mode)
-        labels = _load_single_study(study_dir, label_prefx, data_format=dfmt, plane=plane, norm=lnorm, norm_mode=mode)
+        data = _load_single_study(study_dir, feat_prefx, data_format=dfmt, plane=plane, norm=dnorm, norm_mode=mode,
+                                  out_res=load_res, out_dims=load_shape)
+        labels = _load_single_study(study_dir, label_prefx, data_format=dfmt, plane=plane, norm=lnorm, norm_mode=mode,
+                                    out_res=load_res, out_dims=load_shape, res_order=interp)
 
         # generate batch size==1 format such that format is [1, x, y, z, c] or [1, c, x, y, z]
         data = np.expand_dims(data, axis=0)
@@ -637,6 +676,8 @@ class LoadMulticon3D:
         norm = params.norm_data
         norm_mode = params.norm_mode
         chan_dim = len(params.label_prefix)
+        load_res = params.resample_spacing
+        load_shape = params.load_shape
 
         # sanity checks
         if not os.path.isdir(study_dir):
@@ -646,7 +687,7 @@ class LoadMulticon3D:
 
         # load multi-contrast data and normalize, no slice trimming for infer data
         data = _load_single_study(study_dir, feat_prefx, data_format=data_fmt, plane=plane, norm=norm,
-                                  norm_mode=norm_mode)
+                                  norm_mode=norm_mode, out_res=load_res, out_dims=load_shape)
 
         # generate batch size==1 format such that format is [1, x, y, z, c] or [1, c, x, y, z]
         data = np.expand_dims(data, axis=0)

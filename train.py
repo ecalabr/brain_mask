@@ -21,8 +21,8 @@ def train(params):
     train_logger = logging.getLogger()
     # Make sure data directory exists
     if not os.path.isdir(params.data_dir):
-        raise ValueError("Specified data directory does not exist: {}".format(params.data_dir))
-    train_logger.info("Using data directory {}".format(params.data_dir))
+        raise ValueError(f"Specified data directory does not exist: {params.data_dir}")
+    train_logger.info(f"Using data directory {params.data_dir}")
 
     # determine distribution strategy for multi GPU training
     if params.dist_strat.lower() == 'mirrored':
@@ -32,7 +32,7 @@ def train(params):
         # batch size is multiplied by num replicas
         params.batch_size = params.batch_size * params.strategy.num_replicas_in_sync
         train_logger.info(
-            "Batch size adjusted to {} for {} replicas".format(params.batch_size, params.strategy.num_replicas_in_sync))
+            f"Batch size adjusted to {params.batch_size} for {params.strategy.num_replicas_in_sync} replicas")
         # initial learning rate is multiplied by squre root of replicas
         # params.learning_rate[0] = params.learning_rate[0] * np.sqrt(params.strategy.num_replicas_in_sync)
         # train_logger.info(
@@ -42,7 +42,7 @@ def train(params):
     else:
         params.strategy = tf.distribute.get_strategy()
 
-    # Determine checkpoint directories and determine current epoch
+    # determine checkpoint directories and determine current epoch
     checkpoint_path = os.path.join(params.model_dir, 'checkpoints')
     latest_ckpt = None
     if not os.path.isdir(checkpoint_path):
@@ -51,23 +51,33 @@ def train(params):
     if checkpoints and not params.overwrite:
         latest_ckpt = max(checkpoints, key=os.path.getctime)
         completed_epochs = int(os.path.splitext(os.path.basename(latest_ckpt).split('epoch_')[1])[0].split('_')[0])
-        train_logger.info("Checkpoint exists for epoch {}".format(completed_epochs))
+        train_logger.info(f"Checkpoint exists for epoch {completed_epochs}")
     else:
         completed_epochs = 0
 
-    # generate directories
-    study_dirs = get_study_dirs(params)  # returns a dict of "train", "eval", and "test"
-
-    # generate dataset objects for model inputs
-    input_fn = InputFunctions(params)
-    train_inputs = input_fn.get_dataset(data_dirs=study_dirs["train"], mode="train")
-    eval_inputs = input_fn.get_dataset(data_dirs=study_dirs["eval"], mode="eval")
+    # get model inputs - for both training and validation
+    study_dirs = get_study_dirs(params)  # returns a dict of "train", "val", and "eval"
+    # first check if there is an existing dataset directory
+    dataset_dir = os.path.join(params.model_dir, 'dataset')
+    train_data_dir = os.path.join(dataset_dir, 'train')
+    val_data_dir = os.path.join(dataset_dir, 'val')
+    # if both train and val datasets exist, then load
+    if all([os.path.isdir(item) for item in [train_data_dir, val_data_dir]]):
+        train_logger.info(f"Loading existing training and and validation datasets from {dataset_dir}")
+        train_inputs = tf.data.experimental.load(train_data_dir)
+        val_inputs = tf.data.experimental.load(val_data_dir)
+    # otherwise generate the data on the fly using the input function specified in parameter file
+    else:
+        train_logger.info(f"No dataset folder found, training and validation data will be generated on the fly")
+        input_fn = InputFunctions(params)
+        train_inputs = input_fn.get_dataset(data_dirs=study_dirs["train"], mode="train")
+        val_inputs = input_fn.get_dataset(data_dirs=study_dirs["val"], mode="val")
 
     # Check for existing model and load if exists, otherwise create from scratch
     if latest_ckpt and not params.overwrite:
         train_logger.info("Creating the model to resume checkpoint")
         model = model_fn(params)  # recreating model from scratech may be neccesary if custom loss function is used
-        train_logger.info("Loading model weights checkpoint file {}".format(latest_ckpt))
+        train_logger.info(f"Loading model weights checkpoint file {latest_ckpt}")
         model.load_weights(latest_ckpt)
     else:
         # Define the model from scratch
@@ -82,9 +92,9 @@ def train(params):
     # checkpoint save callback
     if not os.path.isdir(checkpoint_path):
         os.mkdir(checkpoint_path)
-    # save validation loss in name if evaluation files are passed, else use train loss
+    # save validation loss in name if validation files are passed, else use train loss
     if params.train_fract < 1.:
-        ckpt = os.path.join(checkpoint_path, 'epoch_{epoch:02d}_valloss_{val_loss:.4f}.hdf5')
+        ckpt = os.path.join(checkpoint_path, 'epoch_{epoch:02d}_trainloss_{loss:.4f}.hdf5')  # val_loss errors epoch 3
     else:
         ckpt = os.path.join(checkpoint_path, 'epoch_{epoch:02d}_trainloss_{loss:.4f}.hdf5')
     checkpoint = ModelCheckpoint(
@@ -113,17 +123,18 @@ def train(params):
     # TRAINING
     train_logger.info(f"Training for {params.num_epochs} total epochs starting at epoch {completed_epochs + 1}")
     model.fit(
-        train_inputs,
+        # train inputs are repeated infinitely and an epoch is a user define number of steps
+        # this is because model.fit will error with variable epoch size, which can happen with data aumgentation methods
+        train_inputs.repeat(),
         epochs=params.num_epochs,
         initial_epoch=completed_epochs,
         steps_per_epoch=params.samples_per_epoch // params.batch_size,
         callbacks=train_callbacks,
-        validation_data=eval_inputs,
+        validation_data=val_inputs,
         shuffle=False,
         verbose=1)
-    train_logger.info(
-        "Successfully trained model for {} epochs ({} total epochs)".format(params.num_epochs - completed_epochs,
-                                                                            params.num_epochs))
+    epochs_trained = params.num_epochs - completed_epochs
+    train_logger.info(f"Successfully trained model for {epochs_trained} epochs ({params.num_epochs} total epochs)")
 
 
 # executed  as script
@@ -141,7 +152,7 @@ if __name__ == '__main__':
     # Load the parameters from the experiment params.json file in model_dir
     args = parser.parse_args()
     assert args.param_file, "Must specify a parameter file using --param_file"
-    assert os.path.isfile(args.param_file), "No json configuration file found at {}".format(args.param_file)
+    assert os.path.isfile(args.param_file), f"No json configuration file found at {args.param_file}"
 
     # load params from param file
     my_params = load_param_file(args.param_file)
@@ -157,8 +168,8 @@ if __name__ == '__main__':
     if os.path.isfile(log_path) and args.overwrite:
         os.remove(log_path)
     logger = set_logger(log_path, level=args.logging * 10)
-    logger.info("Using model directory {}".format(my_params.model_dir))
-    logger.info("Using TensorFlow version {}".format(tf.__version__))
+    logger.info(f"Using model directory {my_params.model_dir}")
+    logger.info(f"Using TensorFlow version {tf.__version__}")
 
     # do work
     train(my_params)

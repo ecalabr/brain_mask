@@ -22,26 +22,27 @@ def evaluate(params):
     params.strategy = tf.distribute.get_strategy()
 
     # get eval directories
+    # first check for user specified data directories from function arguments
     if hasattr(params, "data_directories"):
         study_dirs = params.data_directories
     else:
-        study_dirs = get_study_dirs(params)["test"]  # returns a dict of "train", "eval", and "test"
+        study_dirs = get_study_dirs(params)["eval"]  # returns a dict of "train", "val", and "eval"
 
-    # check for empty test dirs
+    # check for empty eval dirs
     if not study_dirs:
-        eval_logger.error("No 'test' directories found in the relevant study_dirs_list.yml file! "
-                          "These may need to be added manually depending on how train/test split was implemented. "
+        eval_logger.error("No 'eval' directories found in the relevant study_dirs_list.yml file! "
+                          "These may need to be added manually depending on how train/val/eval split was implemented. "
                           "These may also be specified using the -d argument.")
 
-    # generate dataset objects for model inputs - in this case using test mode
-    eval_inputs = InputFunctions(params).get_dataset(data_dirs=study_dirs, mode="test")
+    # generate dataset objects for model inputs - in this case using eval mode
+    eval_inputs = InputFunctions(params).get_dataset(data_dirs=study_dirs, mode="eval")
 
     # load model from specified checkpoint
     eval_logger.info("Creating the model to resume checkpoint")
     # net_builder input layer uses train_dims, so set these to infer dims to allow different size inference
     params.train_dims = params.infer_dims
     model = model_fn(params)  # recreating model from scratch may be neccesary if custom loss function is used
-    eval_logger.info("Loading model weights checkpoint file {}".format(params.checkpoint))
+    eval_logger.info(f"Loading model weights checkpoint file {params.checkpoint}")
     model.load_weights(params.checkpoint)
 
     # evaluation
@@ -75,7 +76,7 @@ if __name__ == '__main__':
     # Load the parameters from the experiment params.json file in model_dir
     args = parser.parse_args()
     assert args.param_file, "Must specify a parameter file using --param_file"
-    assert os.path.isfile(args.param_file), "No json configuration file found at {}".format(args.param_file)
+    assert os.path.isfile(args.param_file), f"No json configuration file found at {args.param_file}"
 
     # load params from param file
     my_params = load_param_file(args.param_file)

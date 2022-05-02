@@ -35,6 +35,8 @@ label_prefix: [brain_mask]
 mask_prefix: [brain_mask]
 mask_dilate: [232, 232, 80]
 filter_zero: 0.2
+resample_spacing: []
+load_shape: []
 ```
 ### Explanations
 ```yaml
@@ -57,6 +59,14 @@ How much to dilate the input mask after cropping the input images to the tight b
 filter_zero: 0.2
 ```
 Filters out patches where labels == 0 in most of the patch. filter_zero is a float defining the minimum threshold for label pixels > 0 in the patch.
+```yaml
+resample_spacing: []
+```
+When [], this parameter does nothing. Normally this parameter should be an empty list since your NIfTI data should already be in saved in the desired resolution and dimensions. You can use this parameter if you want to resample the NIfTI data to any arbitrary resolution at the time of loading from disk. This parameter will be the image spacing (i.e. resolution) in mm. For example, if you want to resample your NIfTI images to 1 mm x 1 mm x 2 mm at the time of loading, this paramter should be [1, 1, 2]. Note that you can specify a length 1 list (e.g. [1]) if you want all dimensions to be the same resolution/spacing. Note that this is applied immediately after loading the data from disk and can have complex interactions with other parameters that act at later stages of the input function.
+```yaml
+load_shape: []
+```
+When [], this parameter does nothing. Normally this parameter should be an empty list since your NIfTI data should already be in saved in the desired resolution and dimensions. You can use this parameter if you want to pad/crop the NIfTI data to any arbitrary shape at the time of loading from disk. This parameter will be the image shape (i.e. dimensions) in voxels. For example, if you want to pad/crop your NIfTI images to 128 x 128 x 64 voxels at the time of loading, this paramter should be [128, 128, 64]. Note that this is applied immediately after resample_spacing if specified (see above), which is immediately after loading the data from disk. This parameter can have complex interactions with both resample_spacing and with other parameters that act at later stages of the input function.
 
 ## Training parameters
 The following parameters pertain to training and inference inputs:
@@ -199,6 +209,7 @@ batch_size: 8
 num_threads: 6
 samples_per_epoch: 32000
 train_fract: 0.9
+test_fract: 0.0
 learning_rate: [0.001]
 learning_rate_decay: constant
 optimizer: adam
@@ -226,7 +237,11 @@ The number of individual training samples per epoch. This gets divided by batch_
 ```yaml
 train_fract: 0.9
 ```
-The fraction of input series/directories to be used for training. The rest are used for evaluation.
+The fraction of input series/directories to be used for training. The rest (minus any held for testing (see below)) are used for training validation.
+```yaml
+test_fract: 0.0
+```
+The fraction of input series/directories to be held out for evaluation after training is complete. Can be zero if you don't want to hold out a test set. The remaining fraction (1 - (train_fact + test_fract)) are used for training validation. This cannot be larger than 1 - train_fract. This fraction is used by evaluate.py (but not by train.py).
 ```yaml
 learning_rate: [0.001]
 ```

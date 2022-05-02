@@ -9,6 +9,8 @@ label_prefix: [mening]
 mask_prefix: [brain]
 mask_dilate: [50, 50, 50]
 filter_zero: 0
+resample_spacing: []
+load_shape: []
 
 input_function: PatchInputFn3D
 data_plane: ax
@@ -39,6 +41,7 @@ batch_size: 6
 samples_per_epoch: 18000
 num_threads: 12
 train_fract: 1.0
+test_fract: 0.0
 learning_rate: [0.001, 12, 0.5]
 learning_rate_decay: simple_step
 optimizer: adam

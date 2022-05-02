@@ -54,7 +54,6 @@ class PatchInputFn3D:
         dfmt = self.params.data_format
         threads = self.params.num_threads
         shuffle_size = self.params.shuffle_size
-        repeat = False  # infinitely repeat dataset
 
         # mode switch
         # train mode - loads data and labels, shuffles, batches, patches, augments, and filters
@@ -65,10 +64,9 @@ class PatchInputFn3D:
             shuffle = True
             batch = self.params.batch_size
             loader = LoadRoiMulticonAndLabels3D
-            repeat = True  # infinitely repeat dataset
 
         # eval mode - loads data and labels, batches, and patches - no shuffling or augmenting, filtering
-        elif mode.lower() == "eval":
+        elif mode.lower() == "val":
             dims = self.params.train_dims
             overlap = self.params.train_patch_overlap
             self.params.augment_train_data = False  # no augmentation for this mode
@@ -77,8 +75,8 @@ class PatchInputFn3D:
             batch = self.params.batch_size
             loader = LoadRoiMulticonAndLabels3D
 
-        # test mode - loads data and labels - no shuffling, batching, patching, augmenting, or filtering
-        elif mode.lower() == "test":
+        # eval mode - loads data and labels - no shuffling, batching, patching, augmenting, or filtering
+        elif mode.lower() == "eval":
             dims = self.params.infer_dims
             overlap = self.params.infer_patch_overlap
             self.params.augment_train_data = False  # no augmentation for this mode
@@ -124,9 +122,6 @@ class PatchInputFn3D:
         dataset = dataset.batch(batch, drop_remainder=True)
         # prefetch with experimental autotune
         dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
-        # repeat dataset infinitely for train mode only
-        if repeat:
-            dataset = dataset.repeat()
 
         # restore any params changed during this process
         self.params.load_state()
