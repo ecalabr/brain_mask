@@ -116,6 +116,8 @@ Pre-generating your datasets may lead to faster data loading times, and therefor
 
 One potential downside of pre-generated datasets is that each epoch will use exactly the same training data, whereas with on the fly data generation, each epoch has unique data augmentation (assuming data augmentation is used).
 
+If you want to visualize the model inputs from your dataset, see the "Data visualization" section below.
+
 ```
 python generate_dataset.py -p brain_mask_params.yml
 ```
@@ -150,4 +152,14 @@ Note that the output of predict.py is a probability file (after applying the sig
 ```
 python predict.py -p brain_mask/trained_models/T1c/T1c.yml -s data_dir/123456 -c "last" -t 0.5
 ```
-Valid thresholds are any value in linspace(0, 1, 0.01) i.e. any float between 0 and 1 in increments of 0.01. However, if you really want binary mask outputs, then it may be worthwhile using brain_mask.py, which has additional options for smoothing and cleaning up binary outputs. 
+Valid thresholds are any value in linspace(0, 1, 0.01) i.e. any float between 0 and 1 in increments of 0.01. However, if you really want binary mask outputs, then it may be worthwhile using brain_mask.py, which has additional options for smoothing and cleaning up binary outputs.
+
+## Input visualization
+The included script visualize_dataset.py allows you to visualize model inputs for troubleshooting purposes. This will work on either pre-generated datasets or on the fly generated datasets.
+
+```
+python generate_dataset.py -p brain_mask_params.yml -m train --png --nifti -b 20
+```
+For example, the above command will take 20 batches (-b 20) of train data (-m train) and generate both a PNG montage output (--png) and a folder of individual NIfTI outputs (--nifti) that will be exactly the same as the data seen by the model during training.
+
+Note that the PNG montage output only shows the middle slice of each 3D input, while the NIfTI output will include the entire volume.

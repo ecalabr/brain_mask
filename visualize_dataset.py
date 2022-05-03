@@ -13,7 +13,7 @@ import nibabel as nib
 
 
 # make a png montage
-def png_montage(dataset, batches, out_dir, mode):
+def png_montage(dataset, batches, out_dir, mode, overwrite=False):
 
     # logging
     png_logger = logging.getLogger()
@@ -56,6 +56,11 @@ def png_montage(dataset, batches, out_dir, mode):
     height_in = total_heigh / dpi
     plt.subplots_adjust(wspace=0., hspace=0.)
 
+    # check for existing output
+    outname = os.path.join(out_dir, f"{mode}-inputs_{batches}-batches.png")
+    if os.path.isfile(outname) and not overwrite:
+        raise FileExistsError(f"Found existing output file {outname} but overwrite flag is False!")
+
     # batch loop
     for b in range(batches):
         # batch element loop
@@ -76,13 +81,12 @@ def png_montage(dataset, batches, out_dir, mode):
     # save
     fig = plt.gcf()
     fig.set_size_inches(width_in, height_in)
-    outname = os.path.join(out_dir, f"{mode}-inputs_{batches}-batches.png")
     fig.savefig(outname, bbox_inches='tight', dpi=dpi)
     png_logger.info(f"Wrote PNG montage for {batches} {mode} batches to: {outname}")
 
 
 # save niftis
-def save_niftis(dataset, batches, vis_dir, mode):
+def save_niftis(dataset, batches, vis_dir, mode, overwrite=False):
 
     # logging
     nifti_logger = logging.getLogger()
@@ -91,6 +95,9 @@ def save_niftis(dataset, batches, vis_dir, mode):
     out_dir = os.path.join(vis_dir, f"{mode}_niis_{batches}_batches")
     if not os.path.isdir(out_dir):
         os.mkdir(out_dir)
+    # check for existing data
+    elif not args.overwrite:
+        raise FileExistsError(f"Found existing output directory {out_dir} but overwrite flag is False!")
 
     # make infinite dataset iterator and get first element to determine number of inputs
     data_iter = iter(dataset.repeat())
@@ -212,10 +219,14 @@ if __name__ == '__main__':
     else:
         raise ValueError(f"Unknown mode: {args.mode}")
 
+    # make sure at least one visualization option is specified
+    if not any([args.png, args.nifti]):
+        raise ValueError("You must specify either PNG montage (-g/--png) or NIfTI (-n/-nifti) visualization!")
+
     # handle png
     if args.png:
-        png_montage(input_dataset, args.batches, my_params.vis_dir, mode=args.mode)
+        png_montage(input_dataset, args.batches, my_params.vis_dir, mode=args.mode, overwrite=args.overwrite)
 
     # handle nifti
     if args.nifti:
-        save_niftis(input_dataset, args.batches, my_params.vis_dir, mode=args.mode)
+        save_niftis(input_dataset, args.batches, my_params.vis_dir, mode=args.mode, overwrite=args.overwrite)
