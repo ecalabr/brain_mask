@@ -163,3 +163,43 @@ python generate_dataset.py -p brain_mask_params.yml -m train --png --nifti -b 20
 For example, the above command will take 20 batches (-b 20) of train data (-m train) and generate both a PNG montage output (--png) and a folder of individual NIfTI outputs (--nifti) that will be exactly the same as the data seen by the model during training.
 
 Note that the PNG montage output only shows the middle slice of each 3D input, while the NIfTI output will include the entire volume.
+
+## Citation
+Please cite the following publication(s) if you use any part of this project for your own work:
+
+#### Citation 1
+Calabrese E, Villanueva-Meyer JE, Cha S. A fully automated artificial intelligence method for non-invasive, imaging-based identification of genetic alterations in glioblastomas. Scientific reports. 2020 Jul 16;10(1):1-1.
+
+DOI: https://doi.org/10.1038/s41598-020-68857-8
+
+BibTex:
+```
+@article{calabrese2020fully,
+  title={A fully automated artificial intelligence method for non-invasive, imaging-based identification of genetic alterations in glioblastomas},
+  author={Calabrese, Evan and Villanueva-Meyer, Javier E and Cha, Soonmee},
+  journal={Scientific reports},
+  volume={10},
+  number={1},
+  pages={1--11},
+  year={2020},
+  publisher={Nature Publishing Group}
+}
+```
+
+#### Citation 2
+Calabrese E, Rudie JD, Rauschecker AM, Villanueva-Meyer JE, Cha S. Feasibility of Simulated Postcontrast MRI of Glioblastomas and Lower-Grade Gliomas by Using Three-dimensional Fully Convolutional Neural Networks. Radiology: Artificial Intelligence. 2021 May 19;3(5):e200276.
+DOI: https://doi.org/10.1148/ryai.2021200276
+
+BibTeX:
+```
+@article{calabrese2021feasibility,
+  title={Feasibility of Simulated Postcontrast MRI of Glioblastomas and Lower-Grade Gliomas by Using Three-dimensional Fully Convolutional Neural Networks},
+  author={Calabrese, Evan and Rudie, Jeffrey D and Rauschecker, Andreas M and Villanueva-Meyer, Javier E and Cha, Soonmee},
+  journal={Radiology: Artificial Intelligence},
+  volume={3},
+  number={5},
+  pages={e200276},
+  year={2021},
+  publisher={Radiological Society of North America}
+}
+```
