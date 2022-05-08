@@ -57,7 +57,7 @@ def train(params):
 
     # get model inputs - for both training and validation
     study_dirs = get_study_dirs(params)  # returns a dict of "train", "val", and "eval"
-    # first check if there is an existing dataset directory
+    # first check if there is an existing dataset directory containing a pre-generated dataset from generate_dataset.py
     dataset_dir = os.path.join(params.model_dir, 'dataset')
     train_data_dir = os.path.join(dataset_dir, 'train')
     val_data_dir = os.path.join(dataset_dir, 'val')
@@ -66,9 +66,19 @@ def train(params):
         train_logger.info(f"Loading existing training and and validation datasets from {dataset_dir}")
         train_inputs = tf.data.experimental.load(train_data_dir)
         val_inputs = tf.data.experimental.load(val_data_dir)
+        # determine train dataset cardinality and use this instead of params.samples_per_epoch
+        cardinality = tf.data.experimental.cardinality(train_inputs).numpy()
+        train_logger.info("Determining samples per epoch based on pre-generated dataset cardinality")
+        # unknown cardinality = -2, infinite cardinality = -1
+        if cardinality > 0:
+            orig = params.samples_per_epoch
+            params.samples_per_epoch = cardinality * params.batch_size
+            train_logger.info(f"Adjusted parameter samples_per_epoch from {orig} to {params.samples_per_epoch}")
+        else:
+            train_logger.info("Train dataset cardinality could not be determined, using value from parameter file")
     # otherwise generate the data on the fly using the input function specified in parameter file
     else:
-        train_logger.info(f"No dataset folder found, training and validation data will be generated on the fly")
+        train_logger.info("No dataset folder found, training and validation data will be generated on the fly")
         input_fn = InputFunctions(params)
         train_inputs = input_fn.get_dataset(data_dirs=study_dirs["train"], mode="train")
         val_inputs = input_fn.get_dataset(data_dirs=study_dirs["val"], mode="val")
@@ -94,7 +104,7 @@ def train(params):
         os.mkdir(checkpoint_path)
     # save validation loss in name if validation files are passed, else use train loss
     if params.train_fract < 1.:
-        ckpt = os.path.join(checkpoint_path, 'epoch_{epoch:02d}_trainloss_{loss:.4f}.hdf5')  # val_loss errors epoch 3
+        ckpt = os.path.join(checkpoint_path, 'epoch_{epoch:02d}_valloss_{val_loss:.4f}.hdf5')
     else:
         ckpt = os.path.join(checkpoint_path, 'epoch_{epoch:02d}_trainloss_{loss:.4f}.hdf5')
     checkpoint = ModelCheckpoint(
