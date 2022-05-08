@@ -21,14 +21,19 @@ def generate_dataset(params):
     # generate dataset objects for model inputs
     input_fn = InputFunctions(params)
 
+    # handle compression
+    if params.use_gzip_compression:
+        comp = 'GZIP'
+    else:
+        comp = None
+
     # handle eval dataset
     if study_dirs["eval"]:
         start = time.time()
         dataset_logger.info("Saving evaluation dataset...")
         eval_dataset_dir = os.path.join(params.dataset_dir, "eval")
         eval_inputs = input_fn.get_dataset(data_dirs=study_dirs["eval"], mode="eval")
-        eval_inputs.repeat(count=0)
-        tf.data.experimental.save(eval_inputs, eval_dataset_dir)
+        tf.data.experimental.save(eval_inputs, eval_dataset_dir, compression=comp)
         end = time.time()
         dataset_logger.info(f"- elapsed time is {(end - start)/60:0.2f} minutes")
     else:
@@ -40,8 +45,7 @@ def generate_dataset(params):
         dataset_logger.info("Saving validation dataset...")
         val_dataset_dir = os.path.join(params.dataset_dir, "val")
         val_inputs = input_fn.get_dataset(data_dirs=study_dirs["val"], mode="val")
-        val_inputs.repeat(count=0)
-        tf.data.experimental.save(val_inputs, val_dataset_dir)
+        tf.data.experimental.save(val_inputs, val_dataset_dir, compression=comp)
         end = time.time()
         dataset_logger.info(f"- elapsed time is {(end - start) / 60:0.2f} minutes")
     else:
@@ -53,8 +57,7 @@ def generate_dataset(params):
         dataset_logger.info("Saving training dataset...")
         train_dataset_dir = os.path.join(params.dataset_dir, "train")
         train_inputs = input_fn.get_dataset(data_dirs=study_dirs["train"], mode="train")
-        train_inputs.repeat(count=0)
-        tf.data.experimental.save(train_inputs, train_dataset_dir)
+        tf.data.experimental.save(train_inputs, train_dataset_dir, compression=comp)
         end = time.time()
         dataset_logger.info(f"- elapsed time is {(end - start) / 60:0.2f} minutes")
     else:
@@ -72,6 +75,9 @@ if __name__ == '__main__':
     parser.add_argument('-x', '--overwrite', default=False,
                         help="Overwrite existing data.",
                         action='store_true')
+    parser.add_argument('-c', '--compression', default=False,
+                        help="Save data using GZIP compression.",
+                        action='store_true')
 
     # Load the parameters from the experiment params.json file in model_dir
     args = parser.parse_args()
@@ -84,10 +90,12 @@ if __name__ == '__main__':
     # set global random seed for tensorflow operations
     tf.random.set_seed(my_params.random_state)
 
-    # determine dataset directory and create it if it doesn't exist
+    # determine dataset directory and create it if it doesn't exist, if it does exist check overwrite argument
     my_params.dataset_dir = os.path.join(my_params.model_dir, 'dataset')
     if not os.path.isdir(my_params.dataset_dir):
         os.mkdir(my_params.dataset_dir)
+    elif not args.overwrite:
+        raise FileExistsError("Dataset directory already exists and overwrite argument is false!")
 
     # handle logging argument
     log_path = os.path.join(my_params.dataset_dir, 'dataset.log')
@@ -97,10 +105,8 @@ if __name__ == '__main__':
     logger.info(f"Using dataset directory {my_params.dataset_dir}")
     logger.info(f"Using TensorFlow version {tf.__version__}")
 
-    # handle overwrite
-    if len(os.listdir(my_params.dataset_dir)) > 0 and not args.overwrite:
-        logger.warning("Dataset directory is not empty and overwrite argument is false!")
-        raise FileExistsError()
+    # handle compression argument
+    my_params.use_gzip_compression = args.compression
 
     # do work
     generate_dataset(my_params)

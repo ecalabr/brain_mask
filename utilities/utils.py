@@ -273,8 +273,9 @@ def get_study_dirs(params, change_basedir=None):
 def train_val_eval_split(study_dirs, params):
     # assumes study dirs is already shuffled and/or stratified as wanted
     # check for impossible splits
-    if params.test_fract >= (1 - params.train_fract):
-        raise ValueError("Parameter 'test_fract' must be less than 1-'train_fract'. Please adjust the parameter file.")
+    if params.test_fract > (1 - params.train_fract):
+        raise ValueError("Parameter 'test_fract' must be less than or equal to 1-'train_fract'. "
+                         "Please adjust the parameter file.")
     # get indices of different fractions
     train_end_ind = int(np.floor(params.train_fract * len(study_dirs)))
     val_start_ind = train_end_ind
