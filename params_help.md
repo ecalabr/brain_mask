@@ -233,7 +233,7 @@ The number of threads to use for image input function processing.
 ```yaml
 samples_per_epoch: 32000
 ```
-The number of individual training samples per epoch. This gets divided by batch_size to determine how many training steps there will be per epoch.
+The number of individual training samples per epoch. This gets divided by batch_size to determine how many training steps there will be per epoch. Note that when loading pre-generated datasets, this value is not used - rather this value will be determined based on the 'cardinality' of the pre-generated dataset.
 ```yaml
 train_fract: 0.9
 ```
