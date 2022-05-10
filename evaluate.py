@@ -85,7 +85,7 @@ if __name__ == '__main__':
     tf.random.set_seed(my_params.random_state)
 
     # handle logging argument
-    eval_dir = os.path.join(my_params.model_dir, 'evaluate')
+    eval_dir = os.path.join(my_params.model_dir, 'evaluation')
     if not os.path.isdir(eval_dir):
         os.mkdir(eval_dir)
     log_path = os.path.join(eval_dir, 'eval.log')

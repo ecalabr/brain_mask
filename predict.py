@@ -147,7 +147,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--force_cpu', default=False,
                         help="Disable GPU and force all computation to be done on CPU",
                         action='store_true')
-    parser.add_argument('-t', '--threshold', default=None, type=float, choices=list(np.arange(0, 1, 0.01)),
+    parser.add_argument('-t', '--threshold', default=None, type=float,
                         help="Threshold probability output to create a binary mask")
     parser.add_argument('-l', '--logging', default=2, type=int, choices=[1, 2, 3, 4, 5],
                         help="Set logging level: 1=DEBUG, 2=INFO, 3=WARN, 4=ERROR, 5=CRITICAL")
@@ -228,6 +228,11 @@ if __name__ == '__main__':
     if args.force_cpu:
         logger.info("Forcing CPU (GPU disabled)")
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
+    # handle threshold argument
+    if args.threshold:
+        if not 0. < args.threshold < 1.:
+            raise ValueError(f"Threshold must be a float between 0 and 1 but is {args.threshold}")
 
     # make predictions
     my_model = pred_model(my_params, checkpoint=args.checkpoint, cpu=args.force_cpu)

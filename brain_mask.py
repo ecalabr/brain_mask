@@ -12,6 +12,7 @@ from glob import glob
 from utilities.prob2seg import convert_prob
 from utilities.utils import load_param_file, set_logger
 from predict import predict, pred_model
+import time
 
 
 # define function to make a batch of brain masks from a list of directories
@@ -66,6 +67,7 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, checkpoint='last', ove
     for n, direc in enumerate(infer_direcs):
         # report progress
         bm_logger.info(f"Processing directory {n + 1:03} of {len(infer_direcs):03}: {direc}")
+        start = time.time()
         # make sure all required files exist in data directory, if not, skip
         skip = 0
         for suf in params.data_prefix:
@@ -97,7 +99,7 @@ def batch_mask(infer_direcs, param_file, out_dir, suffix, checkpoint='last', ove
 
         # report
         if os.path.isfile(nii_out_path):
-            bm_logger.info("Created mask file at: {}".format(nii_out_path))
+            bm_logger.info(f"Created mask file in ~{round(time.time() - start)} seconds: {nii_out_path}")
             # add to outname list
             outnames.append(nii_out_path)
         else:
