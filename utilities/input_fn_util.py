@@ -87,7 +87,11 @@ def _load_single_study(study_dir, file_prefixes, data_format, out_res=None, out_
             img = np.squeeze(img[:, :, :, 0])
         # handle resampling
         if out_res:
-            img = scipy.ndimage.zoom(img, [i/j for i, j in zip(nii.header.get_zooms()[0:3], out_res)], order=res_order)
+            # determine zooms
+            zooms = [i/j for i, j in zip(nii.header.get_zooms()[0:3], out_res)]
+            # only resample if desired resolution is different from current resolution
+            if not zooms == [1, 1, 1]:
+                img = scipy.ndimage.zoom(img, zooms, order=res_order)
         # handle cropping
         if not list(alloc_dims) == list(img.shape)[0:3]:
             img = _crop_pad_image(img, alloc_dims)
