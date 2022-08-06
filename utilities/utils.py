@@ -74,11 +74,13 @@ def load_param_file(yaml_path):
         def __init__(self, my_yaml_path):
             self.update(my_yaml_path)  # load parameters
             self.check()  # check parameters
-            # handle "same" argument for model_dir
-            if self.model_dir == 'same':  # this allows the model dir to be inferred from params.json file path
-                self.model_dir = os.path.dirname(my_yaml_path)
-            if not os.path.isdir(self.model_dir):
-                raise FileNotFoundError(f"Specified model_dir {self.model_dir} does not exist!")
+            # handle model_dir options
+            if hasattr(self, "model_dir"):
+                # handle "same" argument for model_dir
+                if self.model_dir == 'same':  # this allows the model dir to be inferred from params.json file path
+                    self.model_dir = os.path.dirname(my_yaml_path)
+                if not os.path.isdir(self.model_dir):
+                    raise FileNotFoundError(f"Specified model_dir {self.model_dir} does not exist!")
             self.params_path = my_yaml_path  # path to param file stored here
             self.saved_state = {}
 
@@ -274,7 +276,7 @@ def train_val_eval_split(study_dirs, params):
     # assumes study dirs is already shuffled and/or stratified as wanted
     # check for impossible splits
     if params.test_fract > (1 - params.train_fract):
-        raise ValueError("Parameter 'test_fract' must be less than or equal to 1-'train_fract'. "
+        raise ValueError("Parameter 'test_fract' must be less than or equal to 1 - 'train_fract'. "
                          "Please adjust the parameter file.")
     # get indices of different fractions
     train_end_ind = int(np.floor(params.train_fract * len(study_dirs)))

@@ -1,7 +1,7 @@
-tensorflow~=2.8.0
-tensorflow-gpu~=2.8.0
+tensorflow-gpu~=2.9.1
 matplotlib~=3.5.1
-numpy~=1.21.6
+numpy~=1.22.4
 nibabel~=3.2.2
-scipy~=1.7.3
+scipy~=1.8.1
 pyyaml~=6.0
+pydot~=1.4.2
