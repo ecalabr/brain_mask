@@ -76,7 +76,7 @@ if __name__ == '__main__':
                         help="Overwrite existing data.",
                         action='store_true')
     parser.add_argument('-c', '--compression', default=False,
-                        help="Save data using GZIP compression.",
+                        help="Save data using GZIP compression [slow].",
                         action='store_true')
 
     # Load the parameters from the experiment params.json file in model_dir
