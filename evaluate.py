@@ -21,21 +21,29 @@ def evaluate(params):
     # no GPU distribution for evaluation (default)
     params.strategy = tf.distribute.get_strategy()
 
-    # get eval directories
+    # get eval dataset
+    dataset_dir = os.path.join(params.model_dir, 'dataset')
+    eval_data_dir = os.path.join(dataset_dir, 'eval')
     # first check for user specified data directories from function arguments
     if hasattr(params, "data_directories"):
+        eval_logger.info("Loading data directories specified with command line argument...")
         study_dirs = params.data_directories
+        eval_inputs = InputFunctions(params).get_dataset(data_dirs=study_dirs, mode="eval")
+    # next check if there is an existing dataset directory containing a pre-generated dataset from generate_dataset.py
     else:
-        study_dirs = get_study_dirs(params)["eval"]  # returns a dict of "train", "val", and "eval"
-
-    # check for empty eval dirs
-    if not study_dirs:
-        eval_logger.error("No 'eval' directories found in the relevant study_dirs_list.yml file! "
-                          "These may need to be added manually depending on how train/val/eval split was implemented. "
-                          "These may also be specified using the -d argument.")
-
-    # generate dataset objects for model inputs - in this case using eval mode
-    eval_inputs = InputFunctions(params).get_dataset(data_dirs=study_dirs, mode="eval")
+        if os.path.isdir(eval_data_dir):
+            eval_logger.info(f"Loading existing evaluation dataset from {dataset_dir}")
+            eval_inputs = tf.data.experimental.load(eval_data_dir)
+        # else, try to determine eval dirs from the data directory
+        else:
+            study_dirs = get_study_dirs(params)["eval"]  # returns a dict of "train", "val", and "eval"
+            # check for empty eval dirs
+            if not study_dirs:
+                eval_logger.error("No 'eval' directories found in the relevant study_dirs_list.yml file! "
+                                  "These may need to be added manually depending on train/val/eval split. "
+                                  "These may also be specified using the -d argument.")
+                raise FileNotFoundError
+            eval_inputs = InputFunctions(params).get_dataset(data_dirs=study_dirs, mode="eval")
 
     # load model from specified checkpoint
     eval_logger.info("Creating the model to resume checkpoint")
@@ -46,7 +54,7 @@ def evaluate(params):
     model.load_weights(params.checkpoint)
 
     # evaluation
-    eval_logger.info(f"Evaluating model on {len(study_dirs)} inputs...")
+    eval_logger.info(f"Evaluating model...")
     eval_results = model.evaluate(eval_inputs)
     eval_logger.info("Completed evaluation:")
     # print out metrics - note that the specified loss function is the first metric
@@ -68,7 +76,7 @@ if __name__ == '__main__':
                         help="Disable GPU and force all computation to be done on CPU",
                         action='store_true')
     parser.add_argument('-d', '--directories', default=None, nargs="+", type=str,
-                        help="Optionally specify one or more directories to evaluate")
+                        help="Optionally specify directories to evaluate (overrides other eval data sources)")
     parser.add_argument('-x', '--overwrite', default=False,
                         help="Overwrite existing data.",
                         action='store_true')
@@ -109,7 +117,7 @@ if __name__ == '__main__':
         try:
             vals = [float(item[0:-5].split('_')[-1]) for item in checkpoints]
             my_params.checkpoint = checkpoints[np.argmin(vals)]
-        except:
+        except Exception:
             error = "Could not determine 'best' checkpoint based on checkpoint filenames. " \
                     "Use 'last' or pass a specific checkpoint filename to the checkpoint argument."
             logger.error(error)

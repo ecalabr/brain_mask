@@ -39,7 +39,8 @@ def dice_loss(y_t, y_p):
 def combo_loss3d_mirrored(y_t, y_p):
     bce = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM)(y_t, y_p)
     dice = dice_loss(y_t, y_p)
-    return bce + dice
+    # here we use product since sum reduction BCE is >> 1
+    return bce * dice
 
 
 # sum of dice and binary cross entropy
