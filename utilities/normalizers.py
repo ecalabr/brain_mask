@@ -76,3 +76,14 @@ def med_iqr(img, new_med=0., new_stdev=1.):
     niqr = stats.iqr(img[nonzero_bool], axis=None) * 0.7413 + EPSILON
     img = np.where(nonzero_bool, ((img - med) / (niqr / new_stdev)) + new_med, 0.)
     return img
+
+
+# handle standard CT normalizer
+@Normalizers.register_method("ct_norm")
+def ct_norm(img):
+    # normalize HU of air and bone to range [-1, 1]
+    img = img / 1000.
+    # truncate intensities > 1000 or <-1000
+    img[img < -1] = -1
+    img[img > 1] = 1
+    return img
