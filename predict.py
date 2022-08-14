@@ -22,8 +22,8 @@ def predictions_2_nii(predictions, infer_dir, out_dir, params, mask=None, thresh
     # set up logging
     pred_logger = logging.getLogger()
 
-    # load one of the original images to restore original shape and to use for masking
-    nii1 = nib.load(glob(infer_dir + '/*' + params.data_prefix[0] + '*.nii.gz')[0])
+    # load one of the original images to restore original shape
+    nii1 = nib.load(glob(f"{infer_dir}/*{params.data_prefix[0]}.nii.gz")[0])
     affine = nii1.affine
     name_prefix = os.path.basename(infer_dir[0:-1] if infer_dir.endswith('/') else infer_dir)
 
@@ -74,7 +74,7 @@ def pred_model(params, checkpoint='last', cpu=False):
             try:
                 vals = [float(item[0:-5].split('_')[-1]) for item in checkpoints]
                 ckpt = checkpoints[np.argmin(vals)]
-            except:
+            except Exception:
                 line1 = "Could not determine 'best' checkpoint based on checkpoint filenames. "
                 line2 = "Use 'last' or pass a specific checkpoint filename to the checkpoint argument."
                 pred_logger.error(line1 + line2)

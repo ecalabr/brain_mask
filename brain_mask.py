@@ -225,7 +225,7 @@ if __name__ == '__main__':
         for phys_dev in physical_devices:
             try:
                 tf.config.experimental.set_memory_growth(phys_dev, True)
-            except:
+            except Exception:
                 # Invalid device or cannot modify virtual devices once initialized.
                 pass
 
