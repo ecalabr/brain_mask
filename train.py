@@ -8,7 +8,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0 = INFO, 1 = WARN, 2 = ERROR, 3 = FATAL
 logging.getLogger('tensorflow').setLevel(logging.ERROR)
 import tensorflow as tf
-from tensorflow.keras.callbacks import LearningRateScheduler, ModelCheckpoint, TensorBoard
+from tensorflow.keras.callbacks import LearningRateScheduler, ModelCheckpoint, TensorBoard, CSVLogger
 from utilities.utils import load_param_file, set_logger, get_study_dirs
 from utilities.input_functions import InputFunctions
 from utilities.learning_rates import LearningRates
@@ -127,8 +127,16 @@ def train(params):
         embeddings_freq=0,
         embeddings_metadata=None)
 
+    # training metric logging callback
+    if not hasattr(params, "train_dir"):
+        params.train_dir = os.path.join(params.model_dir, 'train')
+    csv_logger = CSVLogger(
+        os.path.join(params.train_dir, 'train_metrics.csv'),
+        separator=',',
+        append=True)
+
     # combine callbacks for the model
-    train_callbacks = [learning_rate, checkpoint, tensorboard]
+    train_callbacks = [learning_rate, checkpoint, tensorboard, csv_logger]
 
     # TRAINING
     train_logger.info(f"Training for {params.num_epochs} total epochs starting at epoch {completed_epochs + 1}")
@@ -172,6 +180,7 @@ if __name__ == '__main__':
 
     # handle logging argument
     train_dir = os.path.join(my_params.model_dir, 'train')
+    my_params.train_dir = train_dir  # add train dir to params for later use
     if not os.path.isdir(train_dir):
         os.mkdir(train_dir)
     log_path = os.path.join(train_dir, 'train.log')

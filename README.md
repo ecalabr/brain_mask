@@ -6,6 +6,15 @@ The following command will clone a copy of brain_mask to your computer using git
 ```
 git clone https://github.com/ecalabr/brain_mask.git
 ```
+Install the required packages listed in requirements.txt:
+```
+# using pip
+pip install -r requirements.txt
+
+# using Conda
+conda create --name <env_name> --file requirements.txt
+```
+If you are planning to use a GPU, you will also have to follow the instructions for tensorflow-gpu: https://www.tensorflow.org/install/pip 
 
 # Data setup
 This software expects your image data to be in Nifti format with a specific directory tree.
