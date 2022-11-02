@@ -46,6 +46,7 @@ class Unet3dBneck:
         batch_size = self.params.batch_size
         output_filt = self.params.output_filters
         policy = self.params.policy
+        max_filters = 512
 
         # additional setup for network construction
         skips = []
@@ -70,7 +71,8 @@ class Unet3dBneck:
 
             # downsample block
             self.params.base_filters = self.params.base_filters * 2  # double filters before downsampling
-            x = Conv3D(self.params.base_filters, ksize, strides=[2, 2, 2], padding='same', data_format=dfmt,
+            filters = self.params.base_filters if self.params.base_filters <= max_filters else max_filters
+            x = Conv3D(filters, ksize, strides=[2, 2, 2], padding='same', data_format=dfmt,
                        dtype=policy)(x)
 
         # unet horizontal (bottom) bottleneck blocks
@@ -86,7 +88,8 @@ class Unet3dBneck:
 
             # upsample block
             self.params.base_filters = int(round(self.params.base_filters / 2))  # half filters before upsampling
-            x = Conv3DTranspose(self.params.base_filters, ksize, strides=[2, 2, 2], padding='same', data_format=dfmt,
+            filters = self.params.base_filters if self.params.base_filters <= max_filters else max_filters
+            x = Conv3DTranspose(filters, ksize, strides=[2, 2, 2], padding='same', data_format=dfmt,
                                 dtype=policy)(x)
 
             # fuse skip connections with concatenation of features

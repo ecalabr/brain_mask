@@ -23,7 +23,7 @@ label_interp: 0
 
 norm_data: True
 norm_labels: False
-norm_mode: zscore
+norm_mode: ct_norm
 
 model_name: Unet3dBneck
 base_filters: 32

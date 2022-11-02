@@ -61,11 +61,11 @@ def train(params):
     dataset_dir = os.path.join(params.model_dir, 'dataset')
     train_data_dir = os.path.join(dataset_dir, 'train')
     val_data_dir = os.path.join(dataset_dir, 'val')
-    # if both train and val datasets exist, then load
-    if all([os.path.isdir(item) for item in [train_data_dir, val_data_dir]]):
-        train_logger.info(f"Loading existing training and and validation datasets from {dataset_dir}")
+
+    # if train dataset exists, then load
+    if os.path.isdir(train_data_dir):
+        train_logger.info(f"Loading existing training dataset from {train_data_dir}")
         train_inputs = tf.data.experimental.load(train_data_dir)
-        val_inputs = tf.data.experimental.load(val_data_dir)
         # determine train dataset cardinality and use this instead of params.samples_per_epoch
         cardinality = tf.data.experimental.cardinality(train_inputs).numpy()
         train_logger.info("Determining samples per epoch based on pre-generated dataset cardinality")
@@ -76,11 +76,18 @@ def train(params):
             train_logger.info(f"Adjusted parameter samples_per_epoch from {orig} to {params.samples_per_epoch}")
         else:
             train_logger.info("Train dataset cardinality could not be determined, using value from parameter file")
-    # otherwise generate the data on the fly using the input function specified in parameter file
     else:
-        train_logger.info("No dataset folder found, training and validation data will be generated on the fly")
+        train_logger.info("No train dataset folder found, training data will be generated on the fly")
         input_fn = InputFunctions(params)
         train_inputs = input_fn.get_dataset(data_dirs=study_dirs["train"], mode="train")
+
+    # if validate dataset exists, then load
+    if os.path.isdir(val_data_dir):
+        train_logger.info(f"Loading existing validation dataset from {val_data_dir}")
+        val_inputs = tf.data.experimental.load(val_data_dir)
+    else:
+        train_logger.info("No validate dataset folder found, validation data will be generated on the fly")
+        input_fn = InputFunctions(params)
         val_inputs = input_fn.get_dataset(data_dirs=study_dirs["val"], mode="val")
 
     # Check for existing model and load if exists, otherwise create from scratch
