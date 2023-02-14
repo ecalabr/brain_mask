@@ -176,7 +176,7 @@ Note that the PNG montage output only shows the middle slice of each 3D input, w
 ## Citation
 Please cite the following publication(s) if you use any part of this project for your own work:
 
-#### Citation 1
+#### Citation 1 (MRI Brain Masking)
 Calabrese E, Villanueva-Meyer JE, Cha S. A fully automated artificial intelligence method for non-invasive, imaging-based identification of genetic alterations in glioblastomas. Scientific reports. 2020 Jul 16;10(1):1-1.
 
 DOI: https://doi.org/10.1038/s41598-020-68857-8
@@ -195,7 +195,7 @@ BibTex:
 }
 ```
 
-#### Citation 2
+#### Citation 2 (MRI Brain Masking)
 Calabrese E, Rudie JD, Rauschecker AM, Villanueva-Meyer JE, Cha S. Feasibility of Simulated Postcontrast MRI of Glioblastomas and Lower-Grade Gliomas by Using Three-dimensional Fully Convolutional Neural Networks. Radiology: Artificial Intelligence. 2021 May 19;3(5):e200276.
 
 DOI: https://doi.org/10.1148/ryai.2021200276
@@ -211,5 +211,27 @@ BibTeX:
   pages={e200276},
   year={2021},
   publisher={Radiological Society of North America}
+}
+```
+
+#### Citation 3 (CTA Brain Masking)
+Isikbay M, Caton MT, Calabrese E. A Deep Learning Approach for Automated Bone Removal from Computed Tomography Angiography of the Brain. Journal of Digital Imaging. 2023 February 13.
+
+DOI: https://doi.org/10.1007/s10278-023-00788-y
+
+BibTeX:
+```
+@Article{Isikbay2023,
+author={Isikbay, Masis
+and Caton, M. Travis
+and Calabrese, Evan},
+title={A Deep Learning Approach for Automated Bone Removal from Computed Tomography Angiography of the Brain},
+journal={Journal of Digital Imaging},
+year={2023},
+month={Feb},
+day={13},
+issn={1618-727X},
+doi={10.1007/s10278-023-00788-y},
+url={https://doi.org/10.1007/s10278-023-00788-y}
 }
 ```

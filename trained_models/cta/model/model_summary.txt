@@ -1,0 +1,629 @@
+Model: "model"
+__________________________________________________________________________________________________
+ Layer (type)                   Output Shape         Param #     Connected to                     
+==================================================================================================
+ input_1 (InputLayer)           [(1, 256, 256, 256,  0           []                               
+                                 1)]                                                              
+                                                                                                  
+ conv3d (Conv3D)                (1, 256, 256, 256,   896         ['input_1[0][0]']                
+                                32)                                                               
+                                                                                                  
+ batch_normalization (BatchNorm  (1, 256, 256, 256,   128        ['conv3d[0][0]']                 
+ alization)                     32)                                                               
+                                                                                                  
+ leaky_re_lu (LeakyReLU)        (1, 256, 256, 256,   0           ['batch_normalization[0][0]']    
+                                32)                                                               
+                                                                                                  
+ conv3d_1 (Conv3D)              (1, 256, 256, 256,   264         ['leaky_re_lu[0][0]']            
+                                8)                                                                
+                                                                                                  
+ batch_normalization_1 (BatchNo  (1, 256, 256, 256,   32         ['conv3d_1[0][0]']               
+ rmalization)                   8)                                                                
+                                                                                                  
+ leaky_re_lu_1 (LeakyReLU)      (1, 256, 256, 256,   0           ['batch_normalization_1[0][0]']  
+                                8)                                                                
+                                                                                                  
+ conv3d_2 (Conv3D)              (1, 256, 256, 256,   1736        ['leaky_re_lu_1[0][0]']          
+                                8)                                                                
+                                                                                                  
+ batch_normalization_2 (BatchNo  (1, 256, 256, 256,   32         ['conv3d_2[0][0]']               
+ rmalization)                   8)                                                                
+                                                                                                  
+ leaky_re_lu_2 (LeakyReLU)      (1, 256, 256, 256,   0           ['batch_normalization_2[0][0]']  
+                                8)                                                                
+                                                                                                  
+ conv3d_3 (Conv3D)              (1, 256, 256, 256,   288         ['leaky_re_lu_2[0][0]']          
+                                32)                                                               
+                                                                                                  
+ dropout (Dropout)              (1, 256, 256, 256,   0           ['conv3d_3[0][0]']               
+                                32)                                                               
+                                                                                                  
+ tf.math.add (TFOpLambda)       (1, 256, 256, 256,   0           ['dropout[0][0]',                
+                                32)                               'conv3d[0][0]']                 
+                                                                                                  
+ batch_normalization_3 (BatchNo  (1, 256, 256, 256,   128        ['tf.math.add[0][0]']            
+ rmalization)                   32)                                                               
+                                                                                                  
+ leaky_re_lu_3 (LeakyReLU)      (1, 256, 256, 256,   0           ['batch_normalization_3[0][0]']  
+                                32)                                                               
+                                                                                                  
+ conv3d_4 (Conv3D)              (1, 256, 256, 256,   264         ['leaky_re_lu_3[0][0]']          
+                                8)                                                                
+                                                                                                  
+ batch_normalization_4 (BatchNo  (1, 256, 256, 256,   32         ['conv3d_4[0][0]']               
+ rmalization)                   8)                                                                
+                                                                                                  
+ leaky_re_lu_4 (LeakyReLU)      (1, 256, 256, 256,   0           ['batch_normalization_4[0][0]']  
+                                8)                                                                
+                                                                                                  
+ conv3d_5 (Conv3D)              (1, 256, 256, 256,   1736        ['leaky_re_lu_4[0][0]']          
+                                8)                                                                
+                                                                                                  
+ batch_normalization_5 (BatchNo  (1, 256, 256, 256,   32         ['conv3d_5[0][0]']               
+ rmalization)                   8)                                                                
+                                                                                                  
+ leaky_re_lu_5 (LeakyReLU)      (1, 256, 256, 256,   0           ['batch_normalization_5[0][0]']  
+                                8)                                                                
+                                                                                                  
+ conv3d_6 (Conv3D)              (1, 256, 256, 256,   288         ['leaky_re_lu_5[0][0]']          
+                                32)                                                               
+                                                                                                  
+ dropout_1 (Dropout)            (1, 256, 256, 256,   0           ['conv3d_6[0][0]']               
+                                32)                                                               
+                                                                                                  
+ tf.math.add_1 (TFOpLambda)     (1, 256, 256, 256,   0           ['dropout_1[0][0]',              
+                                32)                               'tf.math.add[0][0]']            
+                                                                                                  
+ batch_normalization_6 (BatchNo  (1, 256, 256, 256,   128        ['tf.math.add_1[0][0]']          
+ rmalization)                   32)                                                               
+                                                                                                  
+ leaky_re_lu_6 (LeakyReLU)      (1, 256, 256, 256,   0           ['batch_normalization_6[0][0]']  
+                                32)                                                               
+                                                                                                  
+ conv3d_7 (Conv3D)              (1, 256, 256, 256,   264         ['leaky_re_lu_6[0][0]']          
+                                8)                                                                
+                                                                                                  
+ batch_normalization_7 (BatchNo  (1, 256, 256, 256,   32         ['conv3d_7[0][0]']               
+ rmalization)                   8)                                                                
+                                                                                                  
+ leaky_re_lu_7 (LeakyReLU)      (1, 256, 256, 256,   0           ['batch_normalization_7[0][0]']  
+                                8)                                                                
+                                                                                                  
+ conv3d_8 (Conv3D)              (1, 256, 256, 256,   1736        ['leaky_re_lu_7[0][0]']          
+                                8)                                                                
+                                                                                                  
+ batch_normalization_8 (BatchNo  (1, 256, 256, 256,   32         ['conv3d_8[0][0]']               
+ rmalization)                   8)                                                                
+                                                                                                  
+ leaky_re_lu_8 (LeakyReLU)      (1, 256, 256, 256,   0           ['batch_normalization_8[0][0]']  
+                                8)                                                                
+                                                                                                  
+ conv3d_9 (Conv3D)              (1, 256, 256, 256,   288         ['leaky_re_lu_8[0][0]']          
+                                32)                                                               
+                                                                                                  
+ dropout_2 (Dropout)            (1, 256, 256, 256,   0           ['conv3d_9[0][0]']               
+                                32)                                                               
+                                                                                                  
+ tf.math.add_2 (TFOpLambda)     (1, 256, 256, 256,   0           ['dropout_2[0][0]',              
+                                32)                               'tf.math.add_1[0][0]']          
+                                                                                                  
+ conv3d_10 (Conv3D)             (1, 128, 128, 128,   55360       ['tf.math.add_2[0][0]']          
+                                64)                                                               
+                                                                                                  
+ batch_normalization_9 (BatchNo  (1, 128, 128, 128,   256        ['conv3d_10[0][0]']              
+ rmalization)                   64)                                                               
+                                                                                                  
+ leaky_re_lu_9 (LeakyReLU)      (1, 128, 128, 128,   0           ['batch_normalization_9[0][0]']  
+                                64)                                                               
+                                                                                                  
+ conv3d_11 (Conv3D)             (1, 128, 128, 128,   1040        ['leaky_re_lu_9[0][0]']          
+                                16)                                                               
+                                                                                                  
+ batch_normalization_10 (BatchN  (1, 128, 128, 128,   64         ['conv3d_11[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_10 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_10[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_12 (Conv3D)             (1, 128, 128, 128,   6928        ['leaky_re_lu_10[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_11 (BatchN  (1, 128, 128, 128,   64         ['conv3d_12[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_11 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_11[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_13 (Conv3D)             (1, 128, 128, 128,   1088        ['leaky_re_lu_11[0][0]']         
+                                64)                                                               
+                                                                                                  
+ dropout_3 (Dropout)            (1, 128, 128, 128,   0           ['conv3d_13[0][0]']              
+                                64)                                                               
+                                                                                                  
+ tf.math.add_3 (TFOpLambda)     (1, 128, 128, 128,   0           ['dropout_3[0][0]',              
+                                64)                               'conv3d_10[0][0]']              
+                                                                                                  
+ batch_normalization_12 (BatchN  (1, 128, 128, 128,   256        ['tf.math.add_3[0][0]']          
+ ormalization)                  64)                                                               
+                                                                                                  
+ leaky_re_lu_12 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_12[0][0]'] 
+                                64)                                                               
+                                                                                                  
+ conv3d_14 (Conv3D)             (1, 128, 128, 128,   1040        ['leaky_re_lu_12[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_13 (BatchN  (1, 128, 128, 128,   64         ['conv3d_14[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_13 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_13[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_15 (Conv3D)             (1, 128, 128, 128,   6928        ['leaky_re_lu_13[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_14 (BatchN  (1, 128, 128, 128,   64         ['conv3d_15[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_14 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_14[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_16 (Conv3D)             (1, 128, 128, 128,   1088        ['leaky_re_lu_14[0][0]']         
+                                64)                                                               
+                                                                                                  
+ dropout_4 (Dropout)            (1, 128, 128, 128,   0           ['conv3d_16[0][0]']              
+                                64)                                                               
+                                                                                                  
+ tf.math.add_4 (TFOpLambda)     (1, 128, 128, 128,   0           ['dropout_4[0][0]',              
+                                64)                               'tf.math.add_3[0][0]']          
+                                                                                                  
+ batch_normalization_15 (BatchN  (1, 128, 128, 128,   256        ['tf.math.add_4[0][0]']          
+ ormalization)                  64)                                                               
+                                                                                                  
+ leaky_re_lu_15 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_15[0][0]'] 
+                                64)                                                               
+                                                                                                  
+ conv3d_17 (Conv3D)             (1, 128, 128, 128,   1040        ['leaky_re_lu_15[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_16 (BatchN  (1, 128, 128, 128,   64         ['conv3d_17[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_16 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_16[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_18 (Conv3D)             (1, 128, 128, 128,   6928        ['leaky_re_lu_16[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_17 (BatchN  (1, 128, 128, 128,   64         ['conv3d_18[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_17 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_17[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_19 (Conv3D)             (1, 128, 128, 128,   1088        ['leaky_re_lu_17[0][0]']         
+                                64)                                                               
+                                                                                                  
+ dropout_5 (Dropout)            (1, 128, 128, 128,   0           ['conv3d_19[0][0]']              
+                                64)                                                               
+                                                                                                  
+ tf.math.add_5 (TFOpLambda)     (1, 128, 128, 128,   0           ['dropout_5[0][0]',              
+                                64)                               'tf.math.add_4[0][0]']          
+                                                                                                  
+ batch_normalization_18 (BatchN  (1, 128, 128, 128,   256        ['tf.math.add_5[0][0]']          
+ ormalization)                  64)                                                               
+                                                                                                  
+ leaky_re_lu_18 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_18[0][0]'] 
+                                64)                                                               
+                                                                                                  
+ conv3d_20 (Conv3D)             (1, 128, 128, 128,   1040        ['leaky_re_lu_18[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_19 (BatchN  (1, 128, 128, 128,   64         ['conv3d_20[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_19 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_19[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_21 (Conv3D)             (1, 128, 128, 128,   6928        ['leaky_re_lu_19[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_20 (BatchN  (1, 128, 128, 128,   64         ['conv3d_21[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_20 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_20[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_22 (Conv3D)             (1, 128, 128, 128,   1088        ['leaky_re_lu_20[0][0]']         
+                                64)                                                               
+                                                                                                  
+ dropout_6 (Dropout)            (1, 128, 128, 128,   0           ['conv3d_22[0][0]']              
+                                64)                                                               
+                                                                                                  
+ tf.math.add_6 (TFOpLambda)     (1, 128, 128, 128,   0           ['dropout_6[0][0]',              
+                                64)                               'tf.math.add_5[0][0]']          
+                                                                                                  
+ conv3d_23 (Conv3D)             (1, 64, 64, 64, 128  221312      ['tf.math.add_6[0][0]']          
+                                )                                                                 
+                                                                                                  
+ batch_normalization_21 (BatchN  (1, 64, 64, 64, 128  512        ['conv3d_23[0][0]']              
+ ormalization)                  )                                                                 
+                                                                                                  
+ leaky_re_lu_21 (LeakyReLU)     (1, 64, 64, 64, 128  0           ['batch_normalization_21[0][0]'] 
+                                )                                                                 
+                                                                                                  
+ conv3d_24 (Conv3D)             (1, 64, 64, 64, 32)  4128        ['leaky_re_lu_21[0][0]']         
+                                                                                                  
+ batch_normalization_22 (BatchN  (1, 64, 64, 64, 32)  128        ['conv3d_24[0][0]']              
+ ormalization)                                                                                    
+                                                                                                  
+ leaky_re_lu_22 (LeakyReLU)     (1, 64, 64, 64, 32)  0           ['batch_normalization_22[0][0]'] 
+                                                                                                  
+ conv3d_25 (Conv3D)             (1, 64, 64, 64, 32)  27680       ['leaky_re_lu_22[0][0]']         
+                                                                                                  
+ batch_normalization_23 (BatchN  (1, 64, 64, 64, 32)  128        ['conv3d_25[0][0]']              
+ ormalization)                                                                                    
+                                                                                                  
+ leaky_re_lu_23 (LeakyReLU)     (1, 64, 64, 64, 32)  0           ['batch_normalization_23[0][0]'] 
+                                                                                                  
+ conv3d_26 (Conv3D)             (1, 64, 64, 64, 128  4224        ['leaky_re_lu_23[0][0]']         
+                                )                                                                 
+                                                                                                  
+ dropout_7 (Dropout)            (1, 64, 64, 64, 128  0           ['conv3d_26[0][0]']              
+                                )                                                                 
+                                                                                                  
+ tf.math.add_7 (TFOpLambda)     (1, 64, 64, 64, 128  0           ['dropout_7[0][0]',              
+                                )                                 'conv3d_23[0][0]']              
+                                                                                                  
+ batch_normalization_24 (BatchN  (1, 64, 64, 64, 128  512        ['tf.math.add_7[0][0]']          
+ ormalization)                  )                                                                 
+                                                                                                  
+ leaky_re_lu_24 (LeakyReLU)     (1, 64, 64, 64, 128  0           ['batch_normalization_24[0][0]'] 
+                                )                                                                 
+                                                                                                  
+ conv3d_27 (Conv3D)             (1, 64, 64, 64, 32)  4128        ['leaky_re_lu_24[0][0]']         
+                                                                                                  
+ batch_normalization_25 (BatchN  (1, 64, 64, 64, 32)  128        ['conv3d_27[0][0]']              
+ ormalization)                                                                                    
+                                                                                                  
+ leaky_re_lu_25 (LeakyReLU)     (1, 64, 64, 64, 32)  0           ['batch_normalization_25[0][0]'] 
+                                                                                                  
+ conv3d_28 (Conv3D)             (1, 64, 64, 64, 32)  27680       ['leaky_re_lu_25[0][0]']         
+                                                                                                  
+ batch_normalization_26 (BatchN  (1, 64, 64, 64, 32)  128        ['conv3d_28[0][0]']              
+ ormalization)                                                                                    
+                                                                                                  
+ leaky_re_lu_26 (LeakyReLU)     (1, 64, 64, 64, 32)  0           ['batch_normalization_26[0][0]'] 
+                                                                                                  
+ conv3d_29 (Conv3D)             (1, 64, 64, 64, 128  4224        ['leaky_re_lu_26[0][0]']         
+                                )                                                                 
+                                                                                                  
+ dropout_8 (Dropout)            (1, 64, 64, 64, 128  0           ['conv3d_29[0][0]']              
+                                )                                                                 
+                                                                                                  
+ tf.math.add_8 (TFOpLambda)     (1, 64, 64, 64, 128  0           ['dropout_8[0][0]',              
+                                )                                 'tf.math.add_7[0][0]']          
+                                                                                                  
+ batch_normalization_27 (BatchN  (1, 64, 64, 64, 128  512        ['tf.math.add_8[0][0]']          
+ ormalization)                  )                                                                 
+                                                                                                  
+ leaky_re_lu_27 (LeakyReLU)     (1, 64, 64, 64, 128  0           ['batch_normalization_27[0][0]'] 
+                                )                                                                 
+                                                                                                  
+ conv3d_30 (Conv3D)             (1, 64, 64, 64, 32)  4128        ['leaky_re_lu_27[0][0]']         
+                                                                                                  
+ batch_normalization_28 (BatchN  (1, 64, 64, 64, 32)  128        ['conv3d_30[0][0]']              
+ ormalization)                                                                                    
+                                                                                                  
+ leaky_re_lu_28 (LeakyReLU)     (1, 64, 64, 64, 32)  0           ['batch_normalization_28[0][0]'] 
+                                                                                                  
+ conv3d_31 (Conv3D)             (1, 64, 64, 64, 32)  27680       ['leaky_re_lu_28[0][0]']         
+                                                                                                  
+ batch_normalization_29 (BatchN  (1, 64, 64, 64, 32)  128        ['conv3d_31[0][0]']              
+ ormalization)                                                                                    
+                                                                                                  
+ leaky_re_lu_29 (LeakyReLU)     (1, 64, 64, 64, 32)  0           ['batch_normalization_29[0][0]'] 
+                                                                                                  
+ conv3d_32 (Conv3D)             (1, 64, 64, 64, 128  4224        ['leaky_re_lu_29[0][0]']         
+                                )                                                                 
+                                                                                                  
+ dropout_9 (Dropout)            (1, 64, 64, 64, 128  0           ['conv3d_32[0][0]']              
+                                )                                                                 
+                                                                                                  
+ tf.math.add_9 (TFOpLambda)     (1, 64, 64, 64, 128  0           ['dropout_9[0][0]',              
+                                )                                 'tf.math.add_8[0][0]']          
+                                                                                                  
+ batch_normalization_30 (BatchN  (1, 64, 64, 64, 128  512        ['tf.math.add_9[0][0]']          
+ ormalization)                  )                                                                 
+                                                                                                  
+ leaky_re_lu_30 (LeakyReLU)     (1, 64, 64, 64, 128  0           ['batch_normalization_30[0][0]'] 
+                                )                                                                 
+                                                                                                  
+ conv3d_33 (Conv3D)             (1, 64, 64, 64, 32)  4128        ['leaky_re_lu_30[0][0]']         
+                                                                                                  
+ batch_normalization_31 (BatchN  (1, 64, 64, 64, 32)  128        ['conv3d_33[0][0]']              
+ ormalization)                                                                                    
+                                                                                                  
+ leaky_re_lu_31 (LeakyReLU)     (1, 64, 64, 64, 32)  0           ['batch_normalization_31[0][0]'] 
+                                                                                                  
+ conv3d_34 (Conv3D)             (1, 64, 64, 64, 32)  27680       ['leaky_re_lu_31[0][0]']         
+                                                                                                  
+ batch_normalization_32 (BatchN  (1, 64, 64, 64, 32)  128        ['conv3d_34[0][0]']              
+ ormalization)                                                                                    
+                                                                                                  
+ leaky_re_lu_32 (LeakyReLU)     (1, 64, 64, 64, 32)  0           ['batch_normalization_32[0][0]'] 
+                                                                                                  
+ conv3d_35 (Conv3D)             (1, 64, 64, 64, 128  4224        ['leaky_re_lu_32[0][0]']         
+                                )                                                                 
+                                                                                                  
+ dropout_10 (Dropout)           (1, 64, 64, 64, 128  0           ['conv3d_35[0][0]']              
+                                )                                                                 
+                                                                                                  
+ tf.math.add_10 (TFOpLambda)    (1, 64, 64, 64, 128  0           ['dropout_10[0][0]',             
+                                )                                 'tf.math.add_9[0][0]']          
+                                                                                                  
+ conv3d_transpose (Conv3DTransp  (1, 128, 128, 128,   221248     ['tf.math.add_10[0][0]']         
+ ose)                           64)                                                               
+                                                                                                  
+ tf.identity_1 (TFOpLambda)     (1, 128, 128, 128,   0           ['tf.math.add_6[0][0]']          
+                                64)                                                               
+                                                                                                  
+ tf.concat (TFOpLambda)         (1, 128, 128, 128,   0           ['conv3d_transpose[0][0]',       
+                                128)                              'tf.identity_1[0][0]']          
+                                                                                                  
+ batch_normalization_33 (BatchN  (1, 128, 128, 128,   512        ['tf.concat[0][0]']              
+ ormalization)                  128)                                                              
+                                                                                                  
+ leaky_re_lu_33 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_33[0][0]'] 
+                                128)                                                              
+                                                                                                  
+ conv3d_36 (Conv3D)             (1, 128, 128, 128,   2064        ['leaky_re_lu_33[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_34 (BatchN  (1, 128, 128, 128,   64         ['conv3d_36[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_34 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_34[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_37 (Conv3D)             (1, 128, 128, 128,   6928        ['leaky_re_lu_34[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_35 (BatchN  (1, 128, 128, 128,   64         ['conv3d_37[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_35 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_35[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_38 (Conv3D)             (1, 128, 128, 128,   1088        ['leaky_re_lu_35[0][0]']         
+                                64)                                                               
+                                                                                                  
+ dropout_11 (Dropout)           (1, 128, 128, 128,   0           ['conv3d_38[0][0]']              
+                                64)                                                               
+                                                                                                  
+ conv3d_39 (Conv3D)             (1, 128, 128, 128,   8256        ['tf.concat[0][0]']              
+                                64)                                                               
+                                                                                                  
+ tf.math.add_11 (TFOpLambda)    (1, 128, 128, 128,   0           ['dropout_11[0][0]',             
+                                64)                               'conv3d_39[0][0]']              
+                                                                                                  
+ batch_normalization_36 (BatchN  (1, 128, 128, 128,   256        ['tf.math.add_11[0][0]']         
+ ormalization)                  64)                                                               
+                                                                                                  
+ leaky_re_lu_36 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_36[0][0]'] 
+                                64)                                                               
+                                                                                                  
+ conv3d_40 (Conv3D)             (1, 128, 128, 128,   1040        ['leaky_re_lu_36[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_37 (BatchN  (1, 128, 128, 128,   64         ['conv3d_40[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_37 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_37[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_41 (Conv3D)             (1, 128, 128, 128,   6928        ['leaky_re_lu_37[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_38 (BatchN  (1, 128, 128, 128,   64         ['conv3d_41[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_38 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_38[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_42 (Conv3D)             (1, 128, 128, 128,   1088        ['leaky_re_lu_38[0][0]']         
+                                64)                                                               
+                                                                                                  
+ dropout_12 (Dropout)           (1, 128, 128, 128,   0           ['conv3d_42[0][0]']              
+                                64)                                                               
+                                                                                                  
+ tf.math.add_12 (TFOpLambda)    (1, 128, 128, 128,   0           ['dropout_12[0][0]',             
+                                64)                               'tf.math.add_11[0][0]']         
+                                                                                                  
+ batch_normalization_39 (BatchN  (1, 128, 128, 128,   256        ['tf.math.add_12[0][0]']         
+ ormalization)                  64)                                                               
+                                                                                                  
+ leaky_re_lu_39 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_39[0][0]'] 
+                                64)                                                               
+                                                                                                  
+ conv3d_43 (Conv3D)             (1, 128, 128, 128,   1040        ['leaky_re_lu_39[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_40 (BatchN  (1, 128, 128, 128,   64         ['conv3d_43[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_40 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_40[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_44 (Conv3D)             (1, 128, 128, 128,   6928        ['leaky_re_lu_40[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_41 (BatchN  (1, 128, 128, 128,   64         ['conv3d_44[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_41 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_41[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_45 (Conv3D)             (1, 128, 128, 128,   1088        ['leaky_re_lu_41[0][0]']         
+                                64)                                                               
+                                                                                                  
+ dropout_13 (Dropout)           (1, 128, 128, 128,   0           ['conv3d_45[0][0]']              
+                                64)                                                               
+                                                                                                  
+ tf.math.add_13 (TFOpLambda)    (1, 128, 128, 128,   0           ['dropout_13[0][0]',             
+                                64)                               'tf.math.add_12[0][0]']         
+                                                                                                  
+ batch_normalization_42 (BatchN  (1, 128, 128, 128,   256        ['tf.math.add_13[0][0]']         
+ ormalization)                  64)                                                               
+                                                                                                  
+ leaky_re_lu_42 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_42[0][0]'] 
+                                64)                                                               
+                                                                                                  
+ conv3d_46 (Conv3D)             (1, 128, 128, 128,   1040        ['leaky_re_lu_42[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_43 (BatchN  (1, 128, 128, 128,   64         ['conv3d_46[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_43 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_43[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_47 (Conv3D)             (1, 128, 128, 128,   6928        ['leaky_re_lu_43[0][0]']         
+                                16)                                                               
+                                                                                                  
+ batch_normalization_44 (BatchN  (1, 128, 128, 128,   64         ['conv3d_47[0][0]']              
+ ormalization)                  16)                                                               
+                                                                                                  
+ leaky_re_lu_44 (LeakyReLU)     (1, 128, 128, 128,   0           ['batch_normalization_44[0][0]'] 
+                                16)                                                               
+                                                                                                  
+ conv3d_48 (Conv3D)             (1, 128, 128, 128,   1088        ['leaky_re_lu_44[0][0]']         
+                                64)                                                               
+                                                                                                  
+ dropout_14 (Dropout)           (1, 128, 128, 128,   0           ['conv3d_48[0][0]']              
+                                64)                                                               
+                                                                                                  
+ tf.math.add_14 (TFOpLambda)    (1, 128, 128, 128,   0           ['dropout_14[0][0]',             
+                                64)                               'tf.math.add_13[0][0]']         
+                                                                                                  
+ conv3d_transpose_1 (Conv3DTran  (1, 256, 256, 256,   55328      ['tf.math.add_14[0][0]']         
+ spose)                         32)                                                               
+                                                                                                  
+ tf.identity (TFOpLambda)       (1, 256, 256, 256,   0           ['tf.math.add_2[0][0]']          
+                                32)                                                               
+                                                                                                  
+ tf.concat_1 (TFOpLambda)       (1, 256, 256, 256,   0           ['conv3d_transpose_1[0][0]',     
+                                64)                               'tf.identity[0][0]']            
+                                                                                                  
+ batch_normalization_45 (BatchN  (1, 256, 256, 256,   256        ['tf.concat_1[0][0]']            
+ ormalization)                  64)                                                               
+                                                                                                  
+ leaky_re_lu_45 (LeakyReLU)     (1, 256, 256, 256,   0           ['batch_normalization_45[0][0]'] 
+                                64)                                                               
+                                                                                                  
+ conv3d_49 (Conv3D)             (1, 256, 256, 256,   520         ['leaky_re_lu_45[0][0]']         
+                                8)                                                                
+                                                                                                  
+ batch_normalization_46 (BatchN  (1, 256, 256, 256,   32         ['conv3d_49[0][0]']              
+ ormalization)                  8)                                                                
+                                                                                                  
+ leaky_re_lu_46 (LeakyReLU)     (1, 256, 256, 256,   0           ['batch_normalization_46[0][0]'] 
+                                8)                                                                
+                                                                                                  
+ conv3d_50 (Conv3D)             (1, 256, 256, 256,   1736        ['leaky_re_lu_46[0][0]']         
+                                8)                                                                
+                                                                                                  
+ batch_normalization_47 (BatchN  (1, 256, 256, 256,   32         ['conv3d_50[0][0]']              
+ ormalization)                  8)                                                                
+                                                                                                  
+ leaky_re_lu_47 (LeakyReLU)     (1, 256, 256, 256,   0           ['batch_normalization_47[0][0]'] 
+                                8)                                                                
+                                                                                                  
+ conv3d_51 (Conv3D)             (1, 256, 256, 256,   288         ['leaky_re_lu_47[0][0]']         
+                                32)                                                               
+                                                                                                  
+ dropout_15 (Dropout)           (1, 256, 256, 256,   0           ['conv3d_51[0][0]']              
+                                32)                                                               
+                                                                                                  
+ conv3d_52 (Conv3D)             (1, 256, 256, 256,   2080        ['tf.concat_1[0][0]']            
+                                32)                                                               
+                                                                                                  
+ tf.math.add_15 (TFOpLambda)    (1, 256, 256, 256,   0           ['dropout_15[0][0]',             
+                                32)                               'conv3d_52[0][0]']              
+                                                                                                  
+ batch_normalization_48 (BatchN  (1, 256, 256, 256,   128        ['tf.math.add_15[0][0]']         
+ ormalization)                  32)                                                               
+                                                                                                  
+ leaky_re_lu_48 (LeakyReLU)     (1, 256, 256, 256,   0           ['batch_normalization_48[0][0]'] 
+                                32)                                                               
+                                                                                                  
+ conv3d_53 (Conv3D)             (1, 256, 256, 256,   264         ['leaky_re_lu_48[0][0]']         
+                                8)                                                                
+                                                                                                  
+ batch_normalization_49 (BatchN  (1, 256, 256, 256,   32         ['conv3d_53[0][0]']              
+ ormalization)                  8)                                                                
+                                                                                                  
+ leaky_re_lu_49 (LeakyReLU)     (1, 256, 256, 256,   0           ['batch_normalization_49[0][0]'] 
+                                8)                                                                
+                                                                                                  
+ conv3d_54 (Conv3D)             (1, 256, 256, 256,   1736        ['leaky_re_lu_49[0][0]']         
+                                8)                                                                
+                                                                                                  
+ batch_normalization_50 (BatchN  (1, 256, 256, 256,   32         ['conv3d_54[0][0]']              
+ ormalization)                  8)                                                                
+                                                                                                  
+ leaky_re_lu_50 (LeakyReLU)     (1, 256, 256, 256,   0           ['batch_normalization_50[0][0]'] 
+                                8)                                                                
+                                                                                                  
+ conv3d_55 (Conv3D)             (1, 256, 256, 256,   288         ['leaky_re_lu_50[0][0]']         
+                                32)                                                               
+                                                                                                  
+ dropout_16 (Dropout)           (1, 256, 256, 256,   0           ['conv3d_55[0][0]']              
+                                32)                                                               
+                                                                                                  
+ tf.math.add_16 (TFOpLambda)    (1, 256, 256, 256,   0           ['dropout_16[0][0]',             
+                                32)                               'tf.math.add_15[0][0]']         
+                                                                                                  
+ batch_normalization_51 (BatchN  (1, 256, 256, 256,   128        ['tf.math.add_16[0][0]']         
+ ormalization)                  32)                                                               
+                                                                                                  
+ leaky_re_lu_51 (LeakyReLU)     (1, 256, 256, 256,   0           ['batch_normalization_51[0][0]'] 
+                                32)                                                               
+                                                                                                  
+ conv3d_56 (Conv3D)             (1, 256, 256, 256,   264         ['leaky_re_lu_51[0][0]']         
+                                8)                                                                
+                                                                                                  
+ batch_normalization_52 (BatchN  (1, 256, 256, 256,   32         ['conv3d_56[0][0]']              
+ ormalization)                  8)                                                                
+                                                                                                  
+ leaky_re_lu_52 (LeakyReLU)     (1, 256, 256, 256,   0           ['batch_normalization_52[0][0]'] 
+                                8)                                                                
+                                                                                                  
+ conv3d_57 (Conv3D)             (1, 256, 256, 256,   1736        ['leaky_re_lu_52[0][0]']         
+                                8)                                                                
+                                                                                                  
+ batch_normalization_53 (BatchN  (1, 256, 256, 256,   32         ['conv3d_57[0][0]']              
+ ormalization)                  8)                                                                
+                                                                                                  
+ leaky_re_lu_53 (LeakyReLU)     (1, 256, 256, 256,   0           ['batch_normalization_53[0][0]'] 
+                                8)                                                                
+                                                                                                  
+ conv3d_58 (Conv3D)             (1, 256, 256, 256,   288         ['leaky_re_lu_53[0][0]']         
+                                32)                                                               
+                                                                                                  
+ dropout_17 (Dropout)           (1, 256, 256, 256,   0           ['conv3d_58[0][0]']              
+                                32)                                                               
+                                                                                                  
+ tf.math.add_17 (TFOpLambda)    (1, 256, 256, 256,   0           ['dropout_17[0][0]',             
+                                32)                               'tf.math.add_16[0][0]']         
+                                                                                                  
+ conv3d_59 (Conv3D)             (1, 256, 256, 256,   33          ['tf.math.add_17[0][0]']         
+                                1)                                                                
+                                                                                                  
+ tf.math.sigmoid (TFOpLambda)   (1, 256, 256, 256,   0           ['conv3d_59[0][0]']              
+                                1)                                                                
+                                                                                                  
+==================================================================================================
+Total params: 803,777
+Trainable params: 799,937
+Non-trainable params: 3,840
+__________________________________________________________________________________________________
