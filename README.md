@@ -1,6 +1,9 @@
 # Brain Mask
 brain_mask is a 3D fully convolutional deep neural network designed to mask a variety of common brain MR images.
 
+# License
+CC-BY
+
 # Installation
 The following command will clone a copy of brain_mask to your computer using git:
 ```
